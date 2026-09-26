@@ -53,8 +53,9 @@ Everything works with the controller.
 
 ## Install
 
-1. Get the APK from the Wayfinder store page ([Ko-fi](https://ko-fi.com/thorwayfinder)) and check it (below)
-   against the checksums listed on this repository's release page.
+1. Download `wayfinder-1.0.apk` (free) from this repository's
+   [latest release](https://github.com/Thor-Wayfinder/thor-wayfinder/releases/latest) and check it (below) against
+   the checksums listed there.
 2. **Beta users: uninstall "Thor Wayfinder" (`com.thorwayfinder.app`) first** — 1.0 is a new app (`app.wayfinder`).
 3. Open Wayfinder: the tour sets everything up (accessibility service, keyboard, background running) and teaches
    the combos by doing them.
