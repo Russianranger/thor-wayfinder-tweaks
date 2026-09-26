@@ -6,8 +6,9 @@ press away — all without leaving your game.
 
 https://github.com/user-attachments/assets/226f78aa-bb8b-410a-bae7-4842b72444f0
 
-**[⬇ Download Wayfinder 1.0 (free)](https://github.com/Thor-Wayfinder/thor-wayfinder/releases/latest)** ·
-[Support me on Ko-fi](https://ko-fi.com/thorwayfinder)
+**[⬇ Download Wayfinder 1.0 (free)](https://github.com/Thor-Wayfinder/thor-wayfinder/releases/latest)**
+
+[![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/thorwayfinder)
 
 ## Screenshots
 
@@ -227,5 +228,8 @@ and ideas are welcome as issues.
 
 ## Support
 
-Wayfinder is made by one person. It's free; if it makes your Thor better, you can
-[support me on Ko-fi](https://ko-fi.com/thorwayfinder). Questions and bug reports: open an issue.
+Wayfinder is made by one person. It's free; if it makes your Thor better, you can support me on Ko-fi:
+
+[![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/thorwayfinder)
+
+Questions and bug reports: open an issue.
