@@ -4,45 +4,142 @@
 sends the controller where you want it, gives every game its own buttons, and puts the Thor's settings one
 press away — all without leaving your game.
 
-## What it does
+https://github.com/user-attachments/assets/226f78aa-bb8b-410a-bae7-4842b72444f0
 
-**Screens**
-- **Move or swap apps** between the top and bottom screens — hold Back. Apps keep their place; nothing restarts.
-- **App pairs**: two apps, one press, each opens on its screen. Put your screens back after a restart.
-- Per app: the screen it opens on, what the bottom screen does while it plays (keep on / off).
-- Turn the bottom screen off with a 3-finger tap, or when unused. Screenshots of one or both screens.
+**[⬇ Download Wayfinder 1.0 (free)](https://github.com/Thor-Wayfinder/thor-wayfinder/releases/latest)** ·
+[Support me on Ko-fi](https://ko-fi.com/thorwayfinder)
 
-**The controller**
-- **Combos** on Home and Back (hold Home to see them all): move apps, send the controller to the top or bottom
-  screen, screenshot, brightness, Keyboard & mouse, Game controls — every one can be changed, and combos can also
-  open an app, an app pair or a Wayfinder page.
-- The controller **stays where you send it** — touching the other screen doesn't steal it (or: follows touch,
-  always top, always bottom).
-- **Recent apps with the controller**: browse, open, close, clear all.
+## Screenshots
 
-**Game controls** (Home + X, in any game)
+<table>
+<tr><td width="50%" align="center"><img src="https://github.com/user-attachments/assets/d19e4cc4-f3bb-48d2-b82d-f45442e1722a" alt="The Hub and your combos"><br><sub><b>The Hub</b> — and every combo on the other screen</sub></td><td width="50%" align="center"><img src="https://github.com/user-attachments/assets/cdb46e4f-8801-416a-845a-bf10fad5c8a2" alt="Quick panel"><br><sub><b>Quick panel</b> (AYN button) over your game</sub></td></tr>
+<tr><td width="50%" align="center"><img src="https://github.com/user-attachments/assets/fdbb368b-1626-4194-aa18-561e16a4c5bd" alt="Game controls"><br><sub><b>Game controls</b> (Home + X) — per app, per game</sub></td><td width="50%" align="center"><img src="https://github.com/user-attachments/assets/a969331a-c9a8-4cd9-90c8-7c5a96afcc0a" alt="Hold Home: every combo"><br><sub><b>Hold Home</b> — your combos, over the game</sub></td></tr>
+</table>
 
-- Every game its own buttons — for the whole emulator or for one game inside it (RetroArch, PPSSPP, Dolphin,
-  DuckStation, GameNative… games are detected).
-- Remap buttons, keyboard keys, mouse clicks, turbo, toggle, long / double press, macros, chords, an optional
-  **Shift button** (hold it for a second layer), **gyro aiming**, stick deadzone / response curve, trigger range,
-  Nintendo or Xbox face buttons, emulator hotkey presets.
-- Per game: performance, fan, refresh rate and stick lights too. Share a mapping as a file.
-- Games see a clean copy of the controller: Home and Back combos never reach the game.
+<details>
+<summary><b>More screenshots</b> (7)</summary>
+<br>
 
-**Quick panel** (the AYN button)
-- Brightness and volume for each screen, performance, fan, 60/120 Hz, live temperatures and battery, your shortcut
-  tiles, "Now playing" with "Keep for this game", media controls. Arrange it the way you like.
+<table>
+<tr><td width="50%" align="center"><img src="https://github.com/user-attachments/assets/c7686b61-a119-436f-bdff-ca09d1dee959" alt="Remap a button"><br><sub><b>Remap a button</b> — keys, mouse, macros, actions</sub></td><td width="50%" align="center"><img src="https://github.com/user-attachments/assets/b91a9d3c-10ef-431c-8005-19b17eedf9ff" alt="FPS counter"><br><sub><b>FPS counter</b> + battery and temperatures</sub></td></tr>
+<tr><td width="50%" align="center"><img src="https://github.com/user-attachments/assets/221afad5-042e-4558-9a5e-de0ef508368e" alt="Keyboard and mouse deck"><br><sub><b>Keyboard &amp; mouse</b> (Home + Y) on the other screen</sub></td><td width="50%" align="center"><img src="https://github.com/user-attachments/assets/5f94ea48-fe41-478e-8afe-ba9ba97f473c" alt="Wayfinder Keyboard"><br><sub><b>Wayfinder Keyboard</b> — type with the controller</sub></td></tr>
+<tr><td width="50%" align="center"><img src="https://github.com/user-attachments/assets/10108792-3f29-4d20-9f65-0f587742da8c" alt="Screens and power"><br><sub><b>Screens &amp; power</b> — brightness, colour, sound</sub></td><td width="50%" align="center"><img src="https://github.com/user-attachments/assets/a6c33355-48ae-428d-84ee-f7910120dacc" alt="Appearance"><br><sub><b>Appearance</b> — light / dark, glass, aurora</sub></td></tr>
+<tr><td width="50%" align="center"><img src="https://github.com/user-attachments/assets/50dba744-5c2e-45fe-948c-edc0041cbdff" alt="Recent apps with the controller"><br><sub><b>Recent apps</b>, driven with the controller</sub></td></tr>
+</table>
 
-**And**
-- **Keyboard & mouse** (Home + Y) on the other screen: PC keys, trackpad, numpad, emulator and media pads.
-- **Wayfinder Keyboard**: types into any text field, driven with the controller, on the other screen.
-- **Test the controller**: measures stick drift and sets a deadzone for every game in one press.
-- Sleep & standby (stay asleep in the case, turn off what drains the battery while asleep), a speaker sound fix
-  (the community EQ by Joey, Retro Handhelds, built in),
-  stick lights (colours, effects, follow the screen), Do not disturb while playing, an FPS counter, backups.
+</details>
 
-Everything works with the controller.
+## Everything it does
+
+### Two screens
+- Move / swap apps between screens (Back · hold) — live: the app keeps running and keeps its state
+- A glass slide animation when an app moves
+- "Opens on": each app opens on its own screen
+- App pairs: two apps, one press — from the quick panel or a combo; "Save what's on the screens now"
+- Screens restored after a restart (optional)
+- Recent apps (Back · double), driven by the controller: browse, open, close, clear all
+- Close background apps (Back · triple) — the apps on both screens stay open
+- Home goes home on the screen that has the controller
+
+### Bottom screen & power
+- Bottom screen off with a 3-finger tap (tap again for on) or a 3-finger swipe down
+- Auto-off when the bottom screen is unused (15 s – 2 min)
+- Per-app bottom-screen rule (keep on / off)
+- Screen modes: both / top only / bottom only
+- Stay awake
+- Do not disturb while playing — never touches a Do not disturb you turned on yourself
+
+### Display & sound
+- Brightness per screen; Home + R2 / L2 = brighter / dimmer on both, keeping their difference
+- Volume per screen, and the volume buttons change both together
+- Colour saturation (50–130 %)
+- Speaker fix: EQ, +15 dB with a limiter and a stereo widener — EQ on / off to compare, never on headphones.
+  EQ curve: the community preset by **Joey (Retro Handhelds)** — thank you!
+- 60 / 120 Hz, per app or per game
+- FPS counter on either or both screens, in any corner, + battery and temperatures
+
+### Controller
+- Combos on Home / Back: tap, double, triple, hold, + a button — 16 actions
+- Stick flicks as combo buttons (Home + right stick up / down), and any button can start a combo
+- Combo editor: press the buttons to record a combo
+- Hold Home: a cheat sheet of every combo (let go without pressing anything: nothing happens)
+- Open an app, a pair or a Wayfinder page with a combo
+- Per-app combos: normal / custom / off
+- Send the controller to the top or bottom screen, lock it; 4 modes (follows touch, stays where sent,
+  always top, always bottom)
+- AYN button opens Wayfinder's quick panel (or AYN's drawer)
+- One-press fix for AYN's "press Home twice"
+- Face buttons Nintendo-style / Xbox-style, globally or per app / game
+- Test the controller: stick drift → a suggested deadzone for every game
+- Games see one clean controller that stays controller #1; Home + Back held 5 s = emergency off
+
+### Game controls (Home + X)
+- Remap per app, and per game inside emulators — "Which game?" switcher, "Find by pressing"
+- Automatic game detection (RetroArch, other emulators, GameNative, Cocoon)
+- A button can become a button, the D-pad, keys, the mouse, Android Back, nothing, a macro or a Wayfinder action
+- Several buttons at once, turbo, toggle, long / double press
+- Macros: record, edit, up to 20 steps
+- Chords: two buttons pressed together
+- Hold-to-shift layer (optional, off by default)
+- Stick deadzone / response curve, trigger ranges, swap / invert sticks, D-pad ↔ left stick
+- Gyro: mouse, right stick or steering — always, while holding, toggle or on trigger pull; smoothing,
+  calibration and auto-calibration
+- Emulator presets: RetroArch hotkeys (hold Select + R1 / L1 / R2 / Start), emulator menu on hold Select + Start
+- Copy controls from another app
+- Per-game performance, fan, refresh rate and stick lights
+- Share / import controls as a file — filtered, macros arrive switched off
+
+### Keyboard & mouse
+- A deck on the other screen (Home + Y): PC keys, trackpad, numpad, emulator, media, video, "My pad"
+- Trackpad gestures (2-finger tap = right click, 2-finger drag = scroll, hold + move = drag), sticky
+  Ctrl / Shift / Alt / Win
+- The right pad picked automatically per app
+- Stick-as-mouse mode
+- My pad: your own keys and text snippets
+- Wayfinder Keyboard: type with the controller, 17 languages, accents, password-safe — opens on the other
+  screen so the game keeps its own
+
+### Quick panel (AYN button)
+- A glass panel on the bottom screen, with the game blurred behind
+- Brightness, volume, live stats, screen modes
+- 39 shortcut tiles: Wayfinder, Android and AYN switches (bypass charging, 80 % charge limit, L2 / R2 mode…)
+- Arrange tiles like a home screen; show, hide and reorder the cards
+- "Now playing": keep performance, fan and refresh rate for this game
+- Optional media and details cards
+
+### Per app (App profiles)
+- Screen, bottom screen, performance, fan, refresh rate, combos, controls, lights, guide
+- Two apps open: performance, fan and refresh rate take the more demanding one; buttons and lights
+  follow the app that has the controller
+
+### Guide & notes
+- A game guide (small browser, pin a page) and your notes on the bottom screen, per app
+
+### Stick lights
+- AYN default, off, colour, breathing, strobe, spectrum, screen colour
+- Per app / per game, speed, brightness, a colour for each stick
+
+### Capture
+- Screenshots: top, bottom or both stacked (Home + R1)
+- Screen recording of the top screen (up to 3 min, from the quick panel)
+
+### Sleep & standby
+- Sleep actions: Wi-Fi, Bluetooth, Tailscale, Syncthing… with conditions (delay, battery, charging, hours)
+- Lid guard: stays asleep in its case — with a heat guard (45 °C closed in the case → pauses media,
+  performance to Standard)
+- Pause music and videos when the lid closes
+- Sleep when an external display is unplugged
+- Standby drain stats, battery health, an activity log
+
+### Look & setup
+- Light / dark / system theme, see-through glass, blur, your wallpaper or the aurora backdrop
+- The Hub on either screen — with the Hub on top, the bottom screen shows your combos
+- A status strip: where the controller is, the app on each screen, battery, brightness
+- Settings search
+- A welcome tour with practice mode
+- One-press setup — no root, no Shizuku, no PC
+- Backup & restore
+- Help, troubleshooting, a system-access check, open-source licenses
 
 ## Requirements
 
@@ -53,9 +150,9 @@ Everything works with the controller.
 
 ## Install
 
-1. Download `wayfinder-1.0.apk` (free) from this repository's
-   [latest release](https://github.com/Thor-Wayfinder/thor-wayfinder/releases/latest) and check it (below) against
-   the checksums listed there.
+1. Download `wayfinder-1.0.apk` (free) from the
+   [latest release](https://github.com/Thor-Wayfinder/thor-wayfinder/releases/latest) and check it (below)
+   against the checksums listed there.
 2. **Beta users: uninstall "Thor Wayfinder" (`com.thorwayfinder.app`) first** — 1.0 is a new app (`app.wayfinder`).
 3. Open Wayfinder: the tour sets everything up (accessibility service, keyboard, background running) and teaches
    the combos by doing them.
@@ -109,16 +206,16 @@ apps may restart or refuse to move.
 
 Wayfinder is an independent project, not affiliated with, endorsed or sponsored by AYN or any other company
 named here. AYN, Thor and Odin are trademarks of AYN; Nintendo, Xbox, RetroArch, PPSSPP, Dolphin, DuckStation,
-GameNative, Cocoon, Spotify, Steam, Shizuku and other names are trademarks of their respective owners, used only
-to describe compatibility.
+GameNative, Cocoon, Spotify, Steam, Shizuku, Tailscale, Syncthing and other names are trademarks of their
+respective owners, used only to describe compatibility.
 
 ## License
 
 Wayfinder's own code: [PolyForm Strict 1.0.0](LICENSE) (SPDX: `PolyForm-Strict-1.0.0`) — source-available, not
 open source. The source is published for **transparency and security auditing**. In short: you may read it,
 audit it, and build it as-is for your own personal, non-commercial use; you may **not** share it or builds of
-it, change it, or use it commercially. For anything else, ask through the Ko-fi page
-below. The Wayfinder name and icon are not licensed.
+it, change it, or use it commercially. For anything else, ask through the Ko-fi page below. The Wayfinder name
+and icon are not licensed.
 
 Not covered by that license: the Gradle wrapper (`gradlew`, `gradlew.bat`, `gradle/wrapper/`, Apache 2.0) and
 the libraries built into the app — see
@@ -130,5 +227,5 @@ and ideas are welcome as issues.
 
 ## Support
 
-Wayfinder is made by one person. If it makes your Thor better, you can
-[support it on Ko-fi](https://ko-fi.com/thorwayfinder). Questions and bug reports: open an issue.
+Wayfinder is made by one person. It's free; if it makes your Thor better, you can
+[support me on Ko-fi](https://ko-fi.com/thorwayfinder). Questions and bug reports: open an issue.
