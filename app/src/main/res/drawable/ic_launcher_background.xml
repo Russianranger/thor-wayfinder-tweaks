@@ -1,0 +1,52 @@
+<!-- Aurora backdrop — the same palette as the in-app glass (see ui/GlassTheme.kt). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path android:fillColor="#FF070918" android:pathData="M0,0h108v108h-108z" />
+
+    <!-- electric blue, top-left -->
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="radial" android:centerX="18" android:centerY="16" android:gradientRadius="72">
+                <item android:offset="0" android:color="#E62F5BFF" />
+                <item android:offset="0.5" android:color="#592F5BFF" />
+                <item android:offset="1" android:color="#002F5BFF" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- violet, top-right -->
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="radial" android:centerX="98" android:centerY="22" android:gradientRadius="58">
+                <item android:offset="0" android:color="#CC8A3FFC" />
+                <item android:offset="1" android:color="#008A3FFC" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- pink, bottom-right -->
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="radial" android:centerX="96" android:centerY="100" android:gradientRadius="66">
+                <item android:offset="0" android:color="#D9FF3D8B" />
+                <item android:offset="0.5" android:color="#4DFF3D8B" />
+                <item android:offset="1" android:color="#00FF3D8B" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- teal, bottom-left -->
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="radial" android:centerX="10" android:centerY="98" android:gradientRadius="54">
+                <item android:offset="0" android:color="#B300C2B8" />
+                <item android:offset="1" android:color="#0000C2B8" />
+            </gradient>
+        </aapt:attr>
+    </path>
+</vector>

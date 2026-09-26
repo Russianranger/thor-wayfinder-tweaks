@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Needed on API 30+ to query all installed packages for launch intents -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
+    <!-- Allow requesting battery optimization exemption -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- Persistent status notification while the service runs -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Fallback kill strategy for stubborn apps that refuse to move displays -->
+    <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />
+    <!-- Haptic feedback on long-press trigger -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- #25 Game companion: the Guide tab is a small browser. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- #22 Sleep & standby: read Wi-Fi / network / VPN state, finish actions before suspend. -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Speaker tuning: an audio effect on the output mix. -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+
+    <application
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Wayfinder">
+
+        <activity
+            android:name=".MainActivity"
+            android:theme="@style/Theme.Wayfinder.Glass"
+            android:launchMode="singleTop"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- #20 Quick panel (our drawer): its own task, never pulls the Hub along. -->
+        <activity
+            android:name=".QuickPanelActivity"
+            android:theme="@style/Theme.Wayfinder.Glass"
+            android:taskAffinity="app.wayfinder.panel"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true"
+            android:label="Quick panel"
+            android:configChanges="uiMode|orientation|screenSize|screenLayout|smallestScreenSize|density|keyboard|keyboardHidden|navigation|fontScale"
+            android:exported="false" />
+
+        <!-- #25 Game companion on the bottom screen (own task: never pulls the Hub along). -->
+        <activity
+            android:name=".CompanionActivity"
+            android:theme="@style/Theme.Wayfinder"
+            android:taskAffinity="app.wayfinder.companion"
+            android:launchMode="singleTask"
+            android:label="Guide &amp; notes"
+            android:exported="false" />
+
+        <activity
+            android:name=".TrampolineActivity"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:exported="false" />
+
+
+        <!-- Sending a controls file / a backup to another app (share menu): read-only, one folder,
+             only to the app the user picks (grantUriPermissions, not exported). -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/share_paths" />
+        </provider>
+
+        <!-- Shizuku provider — required for shell-level am commands -->
+        <provider
+            android:name="rikka.shizuku.ShizukuProvider"
+            android:authorities="${applicationId}.shizuku"
+            android:multiprocess="false"
+            android:enabled="true"
+            android:exported="true"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+
+        <service
+            android:name=".ForegroundAppService"
+            android:exported="false"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
+        <!-- #27 — the Thor Keyboard (input method) -->
+        <service
+            android:name=".keyboard.ThorKeyboardService"
+            android:label="Wayfinder Keyboard"
+            android:exported="true"
+            android:permission="android.permission.BIND_INPUT_METHOD">
+            <intent-filter>
+                <action android:name="android.view.InputMethod" />
+            </intent-filter>
+            <meta-data
+                android:name="android.view.im"
+                android:resource="@xml/method" />
+        </service>
+
+    </application>
+
+</manifest>

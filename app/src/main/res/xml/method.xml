@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- #27 — the Thor Keyboard. Settings open the Hub's Keyboard page. -->
+<input-method xmlns:android="http://schemas.android.com/apk/res/android"
+    android:settingsActivity="app.wayfinder.MainActivity"
+    android:supportsSwitchingToNextInputMethod="true"
+    android:isDefault="false" />

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The ONLY folder other apps can be handed a file from (a controls file or a backup the user
+     chose to send): cache/share, emptied before each send. -->
+<paths>
+    <cache-path name="share" path="share/" />
+</paths>

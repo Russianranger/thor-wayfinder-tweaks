@@ -1,0 +1,90 @@
+<!-- Two frosted glass panes = the Thor's stacked screens (wide top, narrower bottom),
+     with a light streak + orb travelling between them = an app moving screens.
+     Kept inside the adaptive-icon safe zone (66dp circle centred at 54,54). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- ── top screen pane (x 28–80, y 30–56) ── -->
+    <path android:pathData="M34,30 h40 a6,6 0,0,1 6,6 v14 a6,6 0,0,1 -6,6 h-40 a6,6 0,0,1 -6,-6 v-14 a6,6 0,0,1 6,-6 z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="54" android:startY="30" android:endX="54" android:endY="56">
+                <item android:offset="0" android:color="#66FFFFFF" />
+                <item android:offset="1" android:color="#1FFFFFFF" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:strokeWidth="1.4" android:fillColor="#00000000"
+        android:pathData="M34,30 h40 a6,6 0,0,1 6,6 v14 a6,6 0,0,1 -6,6 h-40 a6,6 0,0,1 -6,-6 v-14 a6,6 0,0,1 6,-6 z">
+        <aapt:attr name="android:strokeColor">
+            <gradient android:type="linear" android:startX="28" android:startY="30" android:endX="80" android:endY="56">
+                <item android:offset="0" android:color="#F2FFFFFF" />
+                <item android:offset="0.5" android:color="#40FFFFFF" />
+                <item android:offset="1" android:color="#73FFFFFF" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- specular sheen across the top pane -->
+    <path android:pathData="M31,38 C40,33 56,32 74,33 L74,36 C58,35 42,36 31,41 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="31" android:startY="36" android:endX="74" android:endY="36">
+                <item android:offset="0" android:color="#59FFFFFF" />
+                <item android:offset="1" android:color="#00FFFFFF" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- ── bottom screen pane (x 35–73, y 61–80) ── -->
+    <path android:pathData="M40,61 h28 a5,5 0,0,1 5,5 v9 a5,5 0,0,1 -5,5 h-28 a5,5 0,0,1 -5,-5 v-9 a5,5 0,0,1 5,-5 z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="54" android:startY="61" android:endX="54" android:endY="80">
+                <item android:offset="0" android:color="#59FFFFFF" />
+                <item android:offset="1" android:color="#1AFFFFFF" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:strokeWidth="1.4" android:fillColor="#00000000"
+        android:pathData="M40,61 h28 a5,5 0,0,1 5,5 v9 a5,5 0,0,1 -5,5 h-28 a5,5 0,0,1 -5,-5 v-9 a5,5 0,0,1 5,-5 z">
+        <aapt:attr name="android:strokeColor">
+            <gradient android:type="linear" android:startX="35" android:startY="61" android:endX="73" android:endY="80">
+                <item android:offset="0" android:color="#F2FFFFFF" />
+                <item android:offset="0.5" android:color="#40FFFFFF" />
+                <item android:offset="1" android:color="#73FFFFFF" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- ── light streak between the panes ── -->
+    <path android:pathData="M63,40 a2,2 0,0,1 4,0 v30 a2,2 0,0,1 -4,0 z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="65" android:startY="38" android:endX="65" android:endY="72">
+                <item android:offset="0" android:color="#00FFFFFF" />
+                <item android:offset="0.55" android:color="#E6FFFFFF" />
+                <item android:offset="1" android:color="#00FFFFFF" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- ── travelling orb: glow + bright core ── -->
+    <path android:pathData="M65,46.5 a12,12 0,1,1 0,24 a12,12 0,1,1 0,-24 z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="radial" android:centerX="65" android:centerY="58.5" android:gradientRadius="12">
+                <item android:offset="0" android:color="#CC7FD8FF" />
+                <item android:offset="0.45" android:color="#553D9BFF" />
+                <item android:offset="1" android:color="#003D9BFF" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:pathData="M65,54.5 a4,4 0,1,1 0,8 a4,4 0,1,1 0,-8 z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="radial" android:centerX="64" android:centerY="57.5" android:gradientRadius="4.5">
+                <item android:offset="0" android:color="#FFFFFFFF" />
+                <item android:offset="0.6" android:color="#FFCDEBFF" />
+                <item android:offset="1" android:color="#FF6CB4FF" />
+            </gradient>
+        </aapt:attr>
+    </path>
+</vector>

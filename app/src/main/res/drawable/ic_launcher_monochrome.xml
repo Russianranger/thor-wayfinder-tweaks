@@ -1,0 +1,13 @@
+<!-- Android 13 themed-icon layer: the two panes + orb as flat silhouettes. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="3" android:fillColor="#00000000"
+        android:pathData="M34,30 h40 a6,6 0,0,1 6,6 v14 a6,6 0,0,1 -6,6 h-40 a6,6 0,0,1 -6,-6 v-14 a6,6 0,0,1 6,-6 z" />
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="3" android:fillColor="#00000000"
+        android:pathData="M40,61 h28 a5,5 0,0,1 5,5 v9 a5,5 0,0,1 -5,5 h-28 a5,5 0,0,1 -5,-5 v-9 a5,5 0,0,1 5,-5 z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M63.5,42 h3 v30 h-3 z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M65,52.5 a6,6 0,1,1 0,12 a6,6 0,1,1 0,-12 z" />
+</vector>
