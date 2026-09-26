@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.1 — September 2026
+
+- **New: "Close this app"** — an action for any combo or game button: closes the app on the screen that has
+  the controller and goes home there, without Android's multitask view. (No combo by default — pick one.)
+- **Fixed:** in dual-screen games (melonDS, Azahar, Cemu…) the AYN button's quick panel opened hidden under the
+  game's bottom screen. It now opens as the top screen's side sheet over the game; the Guide no longer opens
+  hidden there either.
+- **Fixed:** the quick panel's top bar (CPU, GPU, RAM, Battery) overflowed with the default text size or a
+  12-hour clock — "Battery" wrapped letter by letter or was cut off. Its text now shrinks to fit your text
+  size and clock, so all four readouts stay (RAM steps aside only with the very largest text sizes).
+
 ## 1.0 — September 2026
 
 A new app: **Wayfinder — For the AYN Thor** (package `app.wayfinder`). It replaces the beta "Thor Wayfinder"

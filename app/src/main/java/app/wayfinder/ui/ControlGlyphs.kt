@@ -32,6 +32,7 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.CropSquare
 import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.South
@@ -181,6 +182,7 @@ private fun DpadGlyph(b: ThorButton, size: Dp, ink: Color, chip: Color, rim: Col
 fun actionIcon(a: ThorAction): ImageVector = when (a) {
     ThorAction.SWAP_OR_SEND -> Icons.Rounded.Bolt
     ThorAction.CLEAR_BACKGROUND -> Icons.Rounded.DeleteSweep
+    ThorAction.CLOSE_APP -> Icons.Rounded.Close
     ThorAction.RECENTS -> Icons.Rounded.GridView
     ThorAction.BACK -> Icons.AutoMirrored.Rounded.ArrowBack
     ThorAction.SCREENSHOT -> Icons.Rounded.PhotoCamera

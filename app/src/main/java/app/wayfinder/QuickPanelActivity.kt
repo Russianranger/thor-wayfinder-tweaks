@@ -11,6 +11,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -38,6 +39,9 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.wayfinder.ui.FocusableGlass
 import app.wayfinder.ui.GlassPanel
@@ -372,12 +376,37 @@ private fun PanelHeader(close: () -> Unit, editing: Boolean, toggleEdit: () -> U
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(time, color = g.textPrimary, style = MaterialTheme.typography.titleLarge)
         GlassPanel(Modifier.weight(1f), radius = 14.dp) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 4.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-                Readout("CPU", listOfNotNull(s?.cpuLoad?.let { "$it %" }, s?.cpuTemp?.let { "%.0f°".format(it) }).joinToString(" · "))
-                Readout("GPU", listOfNotNull(s?.gpuLoad?.let { "$it %" }, s?.gpuTemp?.let { "%.0f°".format(it) }).joinToString(" · "))
-                Readout("RAM", s?.ramUsedGb?.let { u -> "%.1f / %.0f GB".format(u, s.ramTotalGb ?: 0f) } ?: "")
-                Readout("Battery", listOfNotNull(s?.battery?.let { "$it %" },
+            // With the default text size (or bigger) and a 12-hour clock the four readouts overflowed —
+            // "Battery" wrapped letter by letter or was cut off (1.1). Their real text is measured and
+            // shrunk just enough to fit; only below a readable minimum does the last one (RAM) step aside.
+            val readouts = listOf(
+                "CPU" to listOfNotNull(s?.cpuLoad?.let { "$it %" }, s?.cpuTemp?.let { "%.0f°".format(it) }).joinToString(" · "),
+                "GPU" to listOfNotNull(s?.gpuLoad?.let { "$it %" }, s?.gpuTemp?.let { "%.0f°".format(it) }).joinToString(" · "),
+                "RAM" to (s?.ramUsedGb?.let { u -> "%.1f/%.0f GB".format(u, s.ramTotalGb ?: 0f) } ?: ""),
+                "Battery" to listOfNotNull(s?.battery?.let { "$it %" },
                     s?.watts?.takeIf { it > 0.05f }?.let { (if (s.charging) "+" else "−") + "%.1f W".format(it) }).joinToString(" · "))
+            val measurer = rememberTextMeasurer()
+            val density = LocalDensity.current
+            val labelStyle = MaterialTheme.typography.labelSmall
+            val valueStyle = MaterialTheme.typography.labelLarge
+            BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 4.dp)) {
+                val gap = 10f   // breathing room between readouts, dp
+                fun widthOf(label: String, value: String): Float = with(density) {
+                    maxOf(measurer.measure(label, labelStyle).size.width, measurer.measure(value.ifEmpty { "—" }, valueStyle).size.width).toDp().value
+                }
+                // readable floor = 72 % of the DEFAULT size: users with large text can shrink further
+                val minScale = (0.72f / density.fontScale).coerceAtMost(0.72f)
+                var shown = readouts
+                var scale = 1f
+                while (true) {
+                    val total = shown.sumOf { (k, v) -> widthOf(k, v).toDouble() }.toFloat()
+                    val fit = (maxWidth.value - gap * shown.size) / total
+                    if (fit >= minScale || shown.size <= 2) { scale = fit.coerceIn(0.5f, 1f); break }
+                    shown = shown.filterNot { it.first == "RAM" }.takeIf { it.size < shown.size } ?: shown.dropLast(1)
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    shown.forEach { (k, v) -> Readout(k, v, scale) }
+                }
             }
         }
         FocusableGlass(onClick = toggleEdit, radius = 14.dp) {
@@ -401,11 +430,14 @@ private fun PanelHeader(close: () -> Unit, editing: Boolean, toggleEdit: () -> U
 }
 
 @Composable
-private fun Readout(label: String, value: String) {
+private fun Readout(label: String, value: String, scale: Float = 1f) {
     val g = LocalGlass.current
+    val small = MaterialTheme.typography.labelSmall
+    val large = MaterialTheme.typography.labelLarge
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(label, color = g.textTertiary, style = MaterialTheme.typography.labelSmall)
-        Text(value.ifEmpty { "—" }, color = g.textPrimary, style = MaterialTheme.typography.labelLarge, maxLines = 1)
+        Text(label, color = g.textTertiary, style = small.copy(fontSize = small.fontSize * scale), maxLines = 1, softWrap = false)
+        Text(value.ifEmpty { "—" }, color = g.textPrimary, style = large.copy(fontSize = large.fontSize * scale), maxLines = 1,
+            softWrap = false, overflow = TextOverflow.Clip)
     }
 }
 

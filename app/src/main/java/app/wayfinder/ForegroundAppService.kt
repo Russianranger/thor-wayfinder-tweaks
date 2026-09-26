@@ -138,7 +138,8 @@ class ForegroundAppService : AccessibilityService() {
         fun openCompanionNow(pkg: String): Boolean {
             val s = instance ?: return false
             val d = s.secondDisplayId() ?: return false
-            s.openCompanion(pkg, d); return true
+            // under a dual-screen game's second screen it would be invisible → the top screen (1.1)
+            s.openCompanion(pkg, if (s.coveredByPresentation(d)) PRIMARY_DISPLAY else d); return true
         }
 
         /** #15 — open a saved pair. */
@@ -211,6 +212,7 @@ class ForegroundAppService : AccessibilityService() {
             return when (action) {
                 ThorAction.SWAP_OR_SEND -> svc.startSwapInBackground()
                 ThorAction.CLEAR_BACKGROUND -> svc.startClearInBackground()
+                ThorAction.CLOSE_APP -> { svc.handler.post { svc.closeCurrentApp() }; true }
                 ThorAction.RECENTS -> { svc.handler.post { svc.openRecents() }; true }
                 ThorAction.BACK -> { svc.handler.post { svc.performGlobalAction(GLOBAL_ACTION_BACK) }; true }
                 ThorAction.TOGGLE_SECOND_SCREEN -> svc.toggleSecondScreen()
@@ -1579,7 +1581,10 @@ class ForegroundAppService : AccessibilityService() {
     fun toggleQuickPanel(onDisplay: Int? = null) {
         inputDeck?.hide()   // the panel goes on top of everything — the deck included
         QuickPanelActivity.current?.let { it.finish(); return }
-        val d = onDisplay ?: secondDisplayId() ?: PRIMARY_DISPLAY
+        val bottom = secondDisplayId()
+        // a dual-screen game's second screen covers the bottom one: the panel opens as the top
+        // screen's side sheet instead, over the (dimmed) game — it would open invisible underneath
+        val d = onDisplay ?: bottom?.takeIf { !coveredByPresentation(it) } ?: PRIMARY_DISPLAY
         panelReturnTo = focusedDisplayId()
         panelApp()?.let { a -> GameProfiles.ask(a); handler.postDelayed({ if (QuickPanelActivity.current != null) GameProfiles.ask(a) }, 1500) }
         if (blanker?.isBlanked(d) == true) blanker?.wake(d)   // else it'd open under the black cover
@@ -1806,6 +1811,7 @@ class ForegroundAppService : AccessibilityService() {
         if (top == null || !AppConfigStore.get(top).companion) return
         val second = secondDisplayId() ?: return
         if (displayApps[second] != null || blanker?.isBlanked(second) == true) return
+        if (coveredByPresentation(second)) return   // the game's own second screen is there (1.1)
         openCompanion(top, second)
     }
 
@@ -2005,6 +2011,29 @@ class ForegroundAppService : AccessibilityService() {
         val m = Regex("""geomBufferSize=\[\s*-?\d+\s+-?\d+\s+(\d+)\s+(\d+)\]""").find(out) ?: return null
         return m.groupValues[1].toInt() to m.groupValues[2].toInt()
     }
+
+    /** 1.1 — another app's second screen covers [displayId]: dual-screen emulators (melonDS, Azahar,
+     *  Cemu…) draw it as a Presentation window, which Android stacks above EVERY activity on that
+     *  display — our quick panel or Guide opened there would sit underneath, invisible. Accessibility
+     *  reports it as a (nearly) full-screen window of no known type above the apps. Our own
+     *  companion screen doesn't count (the Hub's; it steps aside by itself). */
+    private fun coveredByPresentation(displayId: Int): Boolean = try {
+        if (MainActivity.companionShowing()) false
+        else {
+            val known = setOf(AccessibilityWindowInfo.TYPE_APPLICATION, AccessibilityWindowInfo.TYPE_INPUT_METHOD,
+                AccessibilityWindowInfo.TYPE_SYSTEM, AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY,
+                AccessibilityWindowInfo.TYPE_SPLIT_SCREEN_DIVIDER, AccessibilityWindowInfo.TYPE_MAGNIFICATION_OVERLAY)
+            val full = getSystemService(android.hardware.display.DisplayManager::class.java).getDisplay(displayId)
+                ?.let { d -> android.util.DisplayMetrics().also { @Suppress("DEPRECATION") d.getRealMetrics(it) } }
+            val area = full?.let { it.widthPixels.toLong() * it.heightPixels } ?: 0L
+            getWindowsOnAllDisplays().get(displayId).orEmpty().any { w ->
+                if (w.type in known) return@any false
+                val r = android.graphics.Rect().also { w.getBoundsInScreen(it) }
+                val pkg = w.root?.let { n -> n.packageName?.toString().also { n.recycle() } }
+                pkg != packageName && area > 0 && r.width().toLong() * r.height() >= area * 8 / 10
+            }
+        }
+    } catch (e: Exception) { false }
 
     private fun appOnDisplay(displayId: Int): String? = try {
         val wins = getWindowsOnAllDisplays().get(displayId)
@@ -2533,6 +2562,27 @@ class ForegroundAppService : AccessibilityService() {
         val full = if (c.startsWith(".")) "$pkg/$pkg$c" else out
         Log.d(TAG, "Launcher screen on display $displayId: $full")
         return full
+    }
+
+    /** 1.1 — "Close this app": the app on the screen that has the controller is closed (force-stopped,
+     *  like swiping it away in Recents) and that screen goes home. Never Wayfinder, a launcher or
+     *  the system UI; a note says what was closed. */
+    fun closeCurrentApp() {
+        val d = focusedDisplayId()
+        val pkg = (appOnDisplay(d) ?: displayApps[d])
+            ?.takeIf { Shell.isPkg(it) && it != packageName && it !in ignoredPackages && it !in launcherPackages }
+        if (pkg == null) { focusCue?.show(d, "Nothing to close on this screen"); return }
+        val label = runCatching { packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString() }.getOrDefault(pkg)
+        vibrateShort()
+        Thread {
+            val ok = PServiceBridge.isAvailable() && PServiceBridge.forceStop(pkg)
+            handler.post {
+                if (!ok) { focusCue?.show(d, "Couldn't close $label"); return@post }
+                displayApps.entries.removeAll { it.value == pkg }
+                focusCue?.show(d, "Closed $label")
+            }
+            if (ok) goHomeOnDisplay(d)
+        }.apply { isDaemon = true }.start()
     }
 
     private fun goHomeOnDisplay(displayId: Int) {

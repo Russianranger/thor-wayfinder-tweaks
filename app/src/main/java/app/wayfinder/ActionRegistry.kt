@@ -11,6 +11,8 @@ package app.wayfinder
 enum class ThorAction(val title: String, val description: String) {
     SWAP_OR_SEND("Move / swap apps", "Move the app to the other screen — or swap them if both screens have one"),
     CLEAR_BACKGROUND("Close background apps", "Closes the apps you're not using — keeps the ones on the screens"),
+    /** 1.1: close the game without Android's multitask view (it broke the handheld feel). */
+    CLOSE_APP("Close this app", "Closes the app on the screen that has the controller, and goes home there"),
     RECENTS("Recent apps", "Open the multitask view"),
     BACK("Back", "Android's normal Back"),
     // Wired in later phases; present now so bindings/UI can reference them.
@@ -43,7 +45,7 @@ object ActionRegistry {
         ThorAction.TOGGLE_KEEP_AWAKE, ThorAction.FOCUS_SWITCH_UP, ThorAction.FOCUS_SWITCH_DOWN,
         ThorAction.FOCUS_LOCK_TOGGLE, ThorAction.SCREENSHOT, ThorAction.KEYBOARD,
         ThorAction.BRIGHTER, ThorAction.DIMMER, ThorAction.FPS_COUNTER, ThorAction.QUICK_MENU,
-        ThorAction.GAME_CONTROLS, ThorAction.OPEN -> true
+        ThorAction.GAME_CONTROLS, ThorAction.OPEN, ThorAction.CLOSE_APP -> true
         else -> false
     }
 }

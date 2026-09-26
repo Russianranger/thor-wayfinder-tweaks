@@ -124,7 +124,7 @@ internal fun RemapTarget.short(): String = when (this) {
     is RemapTarget.Macro -> "Macro (${steps.size})" + if (armed) "" else " · off"
     is RemapTarget.Mouse -> "🖱 " + label()
     is RemapTarget.Action -> if (a == ThorAction.BACK) "Android Back" else "★ " + when (a) {
-        ThorAction.SWAP_OR_SEND -> "Move/swap"; ThorAction.CLEAR_BACKGROUND -> "Close apps"; ThorAction.RECENTS -> "Recents"
+        ThorAction.SWAP_OR_SEND -> "Move/swap"; ThorAction.CLEAR_BACKGROUND -> "Close apps"; ThorAction.CLOSE_APP -> "Close this app"; ThorAction.RECENTS -> "Recents"
         ThorAction.SCREENSHOT -> "Screenshot"; ThorAction.TOGGLE_SECOND_SCREEN -> "Bottom screen"; ThorAction.TOGGLE_KEEP_AWAKE -> "Stay awake"
         ThorAction.FOCUS_SWITCH_UP -> "Controller ↑"; ThorAction.FOCUS_SWITCH_DOWN -> "Controller ↓"; ThorAction.FOCUS_LOCK_TOGGLE -> "Lock controller"
         ThorAction.KEYBOARD -> "Kbd & mouse"; ThorAction.QUICK_MENU -> "Quick panel"; ThorAction.BRIGHTER -> "Brighter"

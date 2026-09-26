@@ -6,7 +6,7 @@ press away — all without leaving your game.
 
 https://github.com/user-attachments/assets/226f78aa-bb8b-410a-bae7-4842b72444f0
 
-**[⬇ Download Wayfinder 1.0 (free)](https://github.com/Thor-Wayfinder/thor-wayfinder/releases/latest)**
+**[⬇ Download Wayfinder (free)](https://github.com/Thor-Wayfinder/thor-wayfinder/releases/latest)**
 
 [![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/thorwayfinder)
 
@@ -40,6 +40,7 @@ https://github.com/user-attachments/assets/226f78aa-bb8b-410a-bae7-4842b72444f0
 - Screens restored after a restart (optional)
 - Recent apps (Back · double), driven by the controller: browse, open, close, clear all
 - Close background apps (Back · triple) — the apps on both screens stay open
+- Close this app — close the game you're playing with a combo, no multitask view
 - Home goes home on the screen that has the controller
 
 ### Bottom screen & power
@@ -151,7 +152,7 @@ https://github.com/user-attachments/assets/226f78aa-bb8b-410a-bae7-4842b72444f0
 
 ## Install
 
-1. Download `wayfinder-1.0.apk` (free) from the
+1. Download the APK (`wayfinder-<version>.apk`, free) from the
    [latest release](https://github.com/Thor-Wayfinder/thor-wayfinder/releases/latest) and check it (below)
    against the checksums listed there.
 2. **Beta users: uninstall "Thor Wayfinder" (`com.thorwayfinder.app`) first** — 1.0 is a new app (`app.wayfinder`).
@@ -163,9 +164,9 @@ https://github.com/user-attachments/assets/226f78aa-bb8b-410a-bae7-4842b72444f0
 Every release lists the APK's **SHA-256** and the **signing certificate's SHA-256**. Check them before installing:
 
 ```
-certutil -hashfile wayfinder-1.0.apk SHA256            (Windows)
-sha256sum wayfinder-1.0.apk                             (Linux / macOS)
-apksigner verify --print-certs wayfinder-1.0.apk        (the certificate)
+certutil -hashfile wayfinder-1.1.apk SHA256            (Windows)
+sha256sum wayfinder-1.1.apk                             (Linux / macOS)
+apksigner verify --print-certs wayfinder-1.1.apk        (the certificate)
 ```
 
 ## Privacy and security

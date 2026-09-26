@@ -191,6 +191,9 @@ class MainActivity : ComponentActivity() {
 
         /** The quick panel opened / closed: the Hub's bottom-screen panel is a presentation
          *  window, which Android draws ABOVE apps — step aside so the quick panel is on top. */
+        /** The Hub's own screen on the bottom display is up (a Presentation — see [ForegroundAppService]). */
+        fun companionShowing(): Boolean = resumed?.companion != null
+
         fun quickPanelShown(shown: Boolean) {
             val a = resumed ?: return
             a.runOnUiThread { if (shown) { a.companion?.dismiss(); a.companion = null } else a.showCompanion() }
