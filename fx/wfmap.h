@@ -68,6 +68,9 @@ typedef struct {
     // Back's gate for this profile — nothing reaches the game, presses go to Wayfinder (its "With
     // Shift" layer); pressed alone it reaches the game as a short tap on release. 0 = none (default).
     int shift;
+    // Physical stick directions handled by Wayfinder. Bits: LU, LD, LL, LR, RU, RD, RL, RR.
+    // Only these half-axes are removed from the gamepad output; the opposite half still works.
+    unsigned char stick_dirs;
 } wf_map;
 
 typedef struct {
@@ -95,6 +98,8 @@ typedef struct {
     // pressed while it was held, and until when its lone tap is sent to the game (now_ms)
     int shift, shift_used;
     long shift_tap_until;
+    unsigned char stick_block;    // held mapped directions awaiting rest
+    int stick_gate_pending;        // remembers a gate even if pressed/released inside one frame
 } wf_state;
 
 
@@ -129,6 +134,15 @@ static inline int wf_abs_active(const wf_state *s, int a) {
     return d * 8 > wf_range(s, a);           // half-range is range/2 → 25 % of a half = range/8
 }
 
+static inline unsigned char wf_stick_active_dirs(const wf_state *s, const wf_map *m);
+
+/** A profile/source change releases external mappings and requires held directions to rest.
+ *  This separate latch leaves the ordinary controller's pre-gate restore behavior intact. */
+static inline void wf_stick_rearm(wf_state *s, const wf_map *m) {
+    s->stick_block = wf_stick_active_dirs(s, m) & m->stick_dirs;
+    s->stick_gate_pending = 0;
+}
+
 static inline void wf_map_reset(wf_map *m) { memset(m, 0, sizeof *m); }
 
 static inline int wf_is_system(int printed) { return printed == WF_HOME || printed == WF_BACK; }
@@ -154,6 +168,8 @@ static inline void wf_state_rest(wf_state *s) {
     memset(s->akey_prev, 0, sizeof s->akey_prev); memset(s->aabs_prev, 0, sizeof s->aabs_prev);
     memset(s->latch, 0, sizeof s->latch);
     memset(s->vkey, 0, sizeof s->vkey);
+    s->stick_block = 0;
+    s->stick_gate_pending = 0;
 }
 
 /** A virtual press / release (`p <code> <0|1>`): a pad button the pad has (not Home / Back) or a
@@ -204,6 +220,7 @@ static inline int wf_event(wf_state *s, int type, int code, int value, int *prin
             if (g && !s->gated) {         // gate opens: what's held now is NOT consumed
                 for (int i = 0; i < s->nk; i++) s->akey_prev[s->keys[i]] = s->key[s->keys[i]];
                 for (int i = 0; i < s->na; i++) s->aabs_prev[s->axes[i]] = (unsigned char)wf_abs_active(s, s->axes[i]);
+                s->stick_gate_pending = 1;
             }
             if (!g && s->gated) {         // gate closes: whatever is back at rest is free again
                 for (int i = 0; i < s->nk; i++) if (!s->key[s->keys[i]]) s->ckey[s->keys[i]] = 0;
@@ -226,6 +243,7 @@ static inline int wf_event(wf_state *s, int type, int code, int value, int *prin
         if (s->gated && act && !s->aabs_prev[code]) s->cabs[code] = 1;
         if (s->gated) s->aabs_prev[code] = (unsigned char)act;
         if (!s->gated && !act) s->cabs[code] = 0;
+        if (s->shift && s->key[s->shift] && act) s->shift_used = 1;
         return echo;
     }
     return 0;
@@ -271,6 +289,65 @@ static inline void wf_shape(const wf_state *s, int ax, int ay, int *x, int *y, i
     float k = t / r, nx = fx * k * hx, ny = fy * k * hy;
     *x = cx + (int)(nx >= 0 ? nx + .5f : nx - .5f);
     *y = cy + (int)(ny >= 0 ? ny + .5f : ny - .5f);
+}
+
+/** Shaped, gated PHYSICAL sticks, before swaps, inversions, D-pad conversion or gyro. */
+static inline void wf_sticks(const wf_state *s, const wf_map *m, int v[4]) {
+    wf_live_abs(s, WF_LX, &v[0]); wf_live_abs(s, WF_LY, &v[1]);
+    wf_live_abs(s, WF_RX, &v[2]); wf_live_abs(s, WF_RY, &v[3]);
+    if (s->info[WF_LX].maximum) wf_shape(s, WF_LX, WF_LY, &v[0], &v[1], m->dz[0], m->oz[0], m->cv[0]);
+    if (s->info[WF_RX].maximum) wf_shape(s, WF_RX, WF_RY, &v[2], &v[3], m->dz[1], m->oz[1], m->cv[1]);
+}
+
+/** A range-independent signed axis. Normalize each side separately (e.g. 0..255 or
+ *  -32768..32767) so both endpoints are exactly +/-32767 and rest is exactly zero. */
+static inline int wf_normalize_stick(const wf_state *s, int a, int v) {
+    int center = wf_rest(s, a);
+    long delta = (long)wf_clamp(s, a, v) - center;
+    long span = delta < 0 ? (long)center - s->info[a].minimum : (long)s->info[a].maximum - center;
+    return span > 0 ? (int)(delta * 32767 / span) : 0;
+}
+
+/** Shaped physical half-directions outside the cursor's 18% neutral zone, ignoring the
+ *  gate itself. Using the same physical shape matters: "fast" can turn a raw 20% hold
+ *  into an active key/cursor. Reversals release the old half without an exact-zero event. */
+static inline unsigned char wf_stick_active_dirs(const wf_state *s, const wf_map *m) {
+    const int axes[] = {WF_LX, WF_LY, WF_RX, WF_RY};
+    const int bits[] = {2, 0, 6, 4};
+    int v[] = {s->abs[WF_LX], s->abs[WF_LY], s->abs[WF_RX], s->abs[WF_RY]};
+    if (s->info[WF_LX].maximum) wf_shape(s, WF_LX, WF_LY, &v[0], &v[1], m->dz[0], m->oz[0], m->cv[0]);
+    if (s->info[WF_RX].maximum) wf_shape(s, WF_RX, WF_RY, &v[2], &v[3], m->dz[1], m->oz[1], m->cv[1]);
+    unsigned char dirs = 0;
+    for (int i = 0; i < 4; i++) {
+        int n = wf_normalize_stick(s, axes[i], v[i]);
+        if (abs(n) > 5898) dirs |= (unsigned char)(1u << (bits[i] + (n > 0)));
+    }
+    return dirs;
+}
+
+/** Suppress selected physical half-directions, preserving every unmapped half-axis. */
+static inline void wf_stick_suppress(const wf_state *s, unsigned char dirs, int v[4]) {
+    const int axes[] = {WF_LX, WF_LY, WF_RX, WF_RY};
+    const int bits[] = {2, 0, 6, 4};
+    for (int i = 0; i < 4; i++) {
+        int center = wf_rest(s, axes[i]);
+        int bit = bits[i] + (v[i] > center);
+        if (v[i] != center && (dirs & (1u << bit))) v[i] = center;
+    }
+}
+
+/** Values for the S protocol message. A map removed, gate, consumed control, or held
+ *  direction awaiting rest must produce zero so the app releases its keys and mouse. */
+static inline void wf_ext_sticks(wf_state *s, const wf_map *m, int v[4]) {
+    if (!m->stick_dirs) { memset(v, 0, 4 * sizeof *v); return; }
+    unsigned char dirs = wf_stick_active_dirs(s, m);
+    s->stick_block &= dirs;
+    if (s->gated || s->stick_gate_pending) s->stick_block |= dirs & m->stick_dirs;
+    s->stick_gate_pending = 0;
+    wf_sticks(s, m, v);
+    wf_stick_suppress(s, s->stick_block, v);
+    v[0] = wf_normalize_stick(s, WF_LX, v[0]); v[1] = wf_normalize_stick(s, WF_LY, v[1]);
+    v[2] = wf_normalize_stick(s, WF_RX, v[2]); v[3] = wf_normalize_stick(s, WF_RY, v[3]);
 }
 /** Round 8: a trigger's range — nothing below [tlo] %, a full pull from [thi] %. */
 static inline int wf_trig_range(const wf_state *s, const wf_map *m, int a, int v) {
@@ -335,13 +412,11 @@ static inline void wf_compute(const wf_state *s, const wf_map *m, wf_out *o) {
         o->abs[out_a] = wf_clamp(s, out_a, v);
     }
     // Sticks and D-pad.
-    int lx, ly, rx, ry, sx, sy;
-    wf_live_abs(s, WF_LX, &lx); wf_live_abs(s, WF_LY, &ly);
-    wf_live_abs(s, WF_RX, &rx); wf_live_abs(s, WF_RY, &ry);
+    int sticks[4], sx, sy;
+    wf_sticks(s, m, sticks);
+    wf_stick_suppress(s, m->stick_dirs, sticks);
+    int lx = sticks[0], ly = sticks[1], rx = sticks[2], ry = sticks[3];
     wf_live_abs(s, WF_HX, &sx); wf_live_abs(s, WF_HY, &sy);
-    // the PHYSICAL stick's shape (its drift), before any swap
-    if (s->info[WF_LX].maximum) wf_shape(s, WF_LX, WF_LY, &lx, &ly, m->dz[0], m->oz[0], m->cv[0]);
-    if (s->info[WF_RX].maximum) wf_shape(s, WF_RX, WF_RY, &rx, &ry, m->dz[1], m->oz[1], m->cv[1]);
     if (m->swap_sticks) { int t; t = lx; lx = rx; rx = t; t = ly; ly = ry; ry = t; }
     if (m->inv_ly) ly = 2 * wf_rest(s, WF_LY) - ly;
     if (m->inv_ry) ry = 2 * wf_rest(s, WF_RY) - ry;
@@ -372,7 +447,7 @@ static inline void wf_compute(const wf_state *s, const wf_map *m, wf_out *o) {
 }
 
 /**
- * Parse a profile line: "L=n|x|0 k<src>=<dst> sw=0|1 dl=0|1 il=0|1 ir=0|1 td=0|1" (codes in
+ * Parse a profile line: "L=n|x|0 k<src>=<dst> sw=0|1 dl=0|1 il=0|1 ir=0|1 td=0|1 sd=0..255" (codes in
  * hex or decimal; dst 0 = itself, 65535 = none, 0x220..0x223 = D-pad). Home/Back can't be
  * remapped. Returns 0 on success; on any bad token the map is left untouched.
  */
@@ -405,6 +480,7 @@ static inline int wf_parse(wf_map *out, const wf_state *s, const char *line) {
             continue;
         }
         if (!strcmp(k, "tr")) { if (n < 2 || n > 30) return -1; m.turbo_hz = (int)n; continue; }
+        if (!strcmp(k, "sd")) { if (n < 0 || n > 255) return -1; m.stick_dirs = (unsigned char)n; continue; }
         // round 8: dzl/dzr 0..30 · ozl/ozr 70..100 · cvl/cvr 0..2 · tlo 0..50 · thi 50..100
         if ((!strcmp(k, "dzl") || !strcmp(k, "dzr"))) { if (n < 0 || n > 30) return -1; m.dz[k[2] == 'r'] = (int)n; continue; }
         if ((!strcmp(k, "ozl") || !strcmp(k, "ozr"))) { if (n < 70 || n > 100) return -1; m.oz[k[2] == 'r'] = (int)n; continue; }

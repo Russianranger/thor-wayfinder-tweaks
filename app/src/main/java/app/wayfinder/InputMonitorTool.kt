@@ -82,6 +82,7 @@ object InputMonitorTool {
                 }
             } catch (_: Exception) {}
             Log.i("ThorInputTool", "app socket closed → exit")
+            RootInjector.releaseKeys()
             RootInjector.release()
             runCatching { PadLayer.stopForExit() }
             // Wayfinder UNINSTALLED (not just restarting): its data folder disappears a moment after

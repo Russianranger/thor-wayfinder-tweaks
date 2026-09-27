@@ -26,8 +26,8 @@ sealed class RemapTarget {
      *  [armed] false = kept but not played: an IMPORTED macro stays off until the user has
      *  looked at its steps and turned it on (2026-09-25). */
     data class Macro(val steps: List<MacroStep>, val repeat: Boolean = false, val armed: Boolean = true) : RemapTarget()
-    /** A mouse button (0 left, 1 right, 2 middle) or the wheel (3 up, 4 down) — the input
-     *  deck's virtual mouse. */
+    /** The input deck's virtual mouse: clicks (0 left, 1 right, 2 middle), wheel (3 up,
+     *  4 down), or continuous cursor movement (5 up, 6 down, 7 left, 8 right). */
     data class Mouse(val b: Int) : RemapTarget()
 
     fun label(): String = when (this) {
@@ -66,7 +66,7 @@ sealed class RemapTarget {
                 "macro" -> p.getOrElse(2) { "" }.split(';').mapNotNull { MacroStep.fromToken(it) }.take(MacroStep.MAX)
                     .takeIf { it.isNotEmpty() }?.let { Macro(it, p[1] == "1", armed = p.getOrNull(3) != "off") }
                 "act" -> Action(ThorAction.valueOf(p[1]))
-                "mouse" -> p[1].toInt().takeIf { it in 0..4 }?.let { Mouse(it) }
+                "mouse" -> p[1].toInt().takeIf { it in 0..8 }?.let { Mouse(it) }
                 else -> null
             }
         }.getOrNull()
@@ -116,7 +116,8 @@ sealed class RemapTarget {
             else -> 0
         }
 
-        val MOUSE_NAMES = listOf("Left click", "Right click", "Middle click", "Wheel up", "Wheel down")
+        val MOUSE_NAMES = listOf("Left click", "Right click", "Middle click", "Wheel up", "Wheel down",
+            "Cursor up", "Cursor down", "Cursor left", "Cursor right")
 
         /** Short names for the keys offered in the picker. */
         val KEY_NAMES = mapOf(
@@ -213,10 +214,13 @@ data class PadRemap(
     /** Hold-to-shift (§6l): this button, held, gives the others their [shifted] job; null = none (default). */
     val shift: ThorButton? = null,
     val shifted: Map<ThorButton, RemapTarget> = emptyMap(),
+    /** A physical stick's four directions independently become keys / cursor movement / nothing.
+     *  Missing directions keep their original analog output. */
+    val stickDirections: Map<StickDirection, RemapTarget> = emptyMap(),
 ) {
     val isEmpty get() = this == PadRemap()
     val trigRanged get() = trigStart != 0 || trigFull != 100
-    val changes: Int get() = (buttons.keys + fire.keys).size + chords.size +
+    val changes: Int get() = (buttons.keys + fire.keys).size + chords.size + stickDirections.size +
         listOf(swapSticks, invertLeftY, invertRightY, dpadStick, digitalTriggers, gyro.isOn,
             !stickL.isDefault, !stickR.isDefault, trigRanged, shift != null).count { it } + (if (shift != null) shifted.size else 0)
 
@@ -241,6 +245,9 @@ data class PadRemap(
         .apply { if (!stickL.isDefault) put("sl", stickL.toJson()); if (!stickR.isDefault) put("sr", stickR.toJson()) }
         .apply { if (trigRanged) put("ts", trigStart).put("tf", trigFull) }
         .apply { shift?.let { put("sh", it.name) }; if (shifted.isNotEmpty()) put("shl", JSONObject().apply { shifted.forEach { (k, v) -> put(k.name, v.token()) } }) }
+        .apply { if (stickDirections.isNotEmpty()) put("sd", JSONObject().apply {
+            stickDirections.filterValues(::isStickTarget).forEach { (k, v) -> put(k.name, v.token()) }
+        }) }
 
     /** Tokens for the mapping engine (fx/wfmap.h `wf_parse`). */
     fun engineTokens(): String = buildList {
@@ -266,6 +273,8 @@ data class PadRemap(
         if (invertLeftY) add("il=1")
         if (invertRightY) add("ir=1")
         if (digitalTriggers) add("td=1")
+        val directions = stickDirections.filterValues(::isStickTarget)
+        if (directions.isNotEmpty()) add("sd=${directions.keys.fold(0) { mask, d -> mask or (1 shl d.ordinal) }}")
         addAll(stickL.tokens("l")); addAll(stickR.tokens("r"))
         if (trigRanged) { add("tlo=${trigStart.coerceIn(0, 50)}"); add("thi=${trigFull.coerceIn(50, 100)}") }
         shift?.let { b -> CODE[b]?.let { add("sh=0x${it.toString(16)}") } }
@@ -292,6 +301,14 @@ data class PadRemap(
         /** The code wfpad's virtual presses take (`p <code> <0|1>`). */
         fun outCode(b: ThorButton): Int? = CODE[b] ?: DPAD[b]
         val BY_CODE = CODE.entries.associate { (k, v) -> v to k }
+
+        /** Stick movement cannot execute actions, macros or pad-button combinations. */
+        fun isStickTarget(t: RemapTarget): Boolean = when (t) {
+            is RemapTarget.Key -> t.code in 1..KeyEvent.getMaxKeyCode()
+            is RemapTarget.Mouse -> t.b in 5..8
+            RemapTarget.None -> true
+            else -> false
+        }
 
         fun fromJson(o: JSONObject?): PadRemap? {
             o ?: return null
@@ -336,6 +353,11 @@ data class PadRemap(
                     m.keys().forEach { k ->
                         val src = runCatching { ThorButton.valueOf(k) }.getOrNull() ?: return@forEach
                         if (src in SOURCES) RemapTarget.fromToken(m.getString(k))?.let { put(src, it) }
+                    } } } ?: emptyMap(),
+                stickDirections = o.optJSONObject("sd")?.let { m -> buildMap {
+                    m.keys().forEach { k ->
+                        val src = runCatching { StickDirection.valueOf(k) }.getOrNull() ?: return@forEach
+                        RemapTarget.fromToken(m.optString(k))?.takeIf(::isStickTarget)?.let { put(src, it) }
                     } } } ?: emptyMap()).takeIf { !it.isEmpty }
         }
     }

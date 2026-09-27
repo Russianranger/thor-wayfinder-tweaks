@@ -1,5 +1,8 @@
 # Wayfinder — For the AYN Thor
 
+This fork adds configurable keyboard and mouse-cursor outputs for each direction of both analog sticks.
+See [Wayfinder test setup and testing](WAYFINDER_TEST.md) and [download the test APK](https://github.com/Russianranger/thor-wayfinder-tweaks/releases).
+
 **Two screens, one controller.** Wayfinder moves apps between the Thor's screens without restarting them,
 sends the controller where you want it, gives every game its own buttons, and puts the Thor's settings one
 press away — all without leaving your game.
@@ -187,9 +190,11 @@ The source is published so anyone can audit it.
 - Android Studio (its JBR, JDK 17+) with the Android SDK; the native parts need the NDK (27.2.12479018).
 - `./gradlew :app:assembleDebug` — a debug build (use `-Pminify` for a build shrunk like the release).
 - Native binaries shipped in `app/src/main/assets/fx/` are built from `fx/`:
-  `tools/build_wfpad.sh` (the input layer; `tools/build_wfpad.sh test` runs its unit tests on a Thor) and
-  `tools/build_fx.sh` (the speaker widener) — Windows + Git Bash, NDK in the default SDK folder. SHA-256 of the shipped copies:
-  - `wfpad` — `deebfd178ec016a077c8480950b4b87f977977aa3743e2bcfa1623f13461127d`
+  `tools/build_wfpad.sh` (the input layer; supports Linux, macOS and Windows/Git Bash; set `ANDROID_HOME` or `ANDROID_NDK_HOME`), and
+  `tools/build_fx.sh` (the speaker widener; Windows + Git Bash, NDK in the default SDK folder).
+  Run `bash tools/build_wfpad.sh host-test` for native regression tests, or `bash tools/build_wfpad.sh test` to run them on a connected Thor.
+  SHA-256 of the shipped copies:
+  - `wfpad` — `528960c4fa04b38409987d4255d0f81a41fe38cf14ced63bf400878cd8729943`
   - `libwfwide.so` — `f64974296927c51c1645b5c56af38504ef5e364d34df7620c07c0ce8a08d6b8a`
 
   Rebuilt from this source with NDK 27.2.12479018 and those scripts, both come out byte-identical.

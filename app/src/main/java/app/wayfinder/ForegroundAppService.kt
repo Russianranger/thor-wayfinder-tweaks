@@ -584,8 +584,9 @@ class ForegroundAppService : AccessibilityService() {
             // the app's own buttons (keys, macros, long press…): nothing held survives a switch — of
             // the profile itself, not only of the engine's tokens (two profiles can share tokens)
             val switched = PadLayerCtl.wanted && PadLayerCtl.setProfile(padProfileFor(key))
-            if (switched || key != lastProfileKey) { lastProfileKey = key; ExtEngine.releaseAll() }
-            ExtEngine.remap = key?.let { Profiles.get(it).remap }
+            ExtEngine.follow(key?.takeIf { PadLayerCtl.wanted }?.let { Profiles.get(it).remap },
+                force = switched || key != lastProfileKey)
+            lastProfileKey = key
             // gyro: needs the layer (its stick goes through our copy of the pad, its on/off button too)
             GyroEngine.follow(key, key?.takeIf { PadLayerCtl.wanted }?.let { Profiles.get(it).remap?.gyro })
             handler.postDelayed(this, 500)
@@ -1011,6 +1012,7 @@ class ForegroundAppService : AccessibilityService() {
                 Intent.ACTION_SCREEN_OFF -> {
                     screenOn = false
                     app.wayfinder.lights.StickLights.pause(); SleepEngine.onScreenOff(); GyroEngine.setScreenOn(false)
+                    ExtEngine.setScreenOn(false)
                     // the root helper's samplers (screen colour ~12/s, frame rate) sleep too
                     if (ambientPhys != null) { InputMonitor.send("A -"); ambientPhys = null }
                     if (fpsWatching != null) { InputMonitor.send("F - -"); fpsWatching = null }
@@ -1019,6 +1021,7 @@ class ForegroundAppService : AccessibilityService() {
                 Intent.ACTION_SCREEN_ON -> {
                     screenOn = true
                     app.wayfinder.lights.StickLights.resume(this@ForegroundAppService); SleepEngine.onScreenOn(); GyroEngine.setScreenOn(true)
+                    ExtEngine.setScreenOn(true)
                     applyFps()     // the lights ask for the screen colour again themselves
                     handler.removeCallbacks(padProfileTick); handler.post(padProfileTick)
                 }
@@ -1346,8 +1349,10 @@ class ForegroundAppService : AccessibilityService() {
         }
         InputMonitor.gatedListener = { t, c, v -> onGatedEvent(t, c, v) }
         InputMonitor.extListener = { c, v -> ExtEngine.onExt(c, v) }
+        InputMonitor.sticksListener = { lx, ly, rx, ry -> ExtEngine.onSticks(lx, ly, rx, ry) }
         ExtEngine.display = { controllerDisplay() }
         ExtEngine.perform = { a -> Companion.perform(a) }
+        ExtEngine.setScreenOn(getSystemService(PowerManager::class.java).isInteractive)
         GyroEngine.init(this)
         GameProfiles.init(this)
         // A full restore restarted Wayfinder (Backup.restartApp): back to where the user was
@@ -1400,11 +1405,12 @@ class ForegroundAppService : AccessibilityService() {
             // Leave the sticks as AYN's own settings say, not on our last effect.
             app.wayfinder.lights.StickLights.apply(this, app.wayfinder.lights.LightProfile())
             InputMonitor.listener = null; InputMonitor.gatedListener = null; InputMonitor.extListener = null
+            InputMonitor.sticksListener = null
             InputMonitor.onHelperConnected = null; InputMonitor.fpsListener = null; InputMonitor.ambientListener = null
             app.wayfinder.lights.StickLights.screenSampler = null; app.wayfinder.lights.StickLights.screenStop = null
             PadLayerCtl.onEmergencyOff = null
             PadLayerCtl.onLayerFailed = null
-            ExtEngine.releaseAll(); GyroEngine.follow(null, null)
+            ExtEngine.follow(null, force = true); GyroEngine.follow(null, null)
             // the root helper outlives us (same process): stop its samplers, give every app the plain
             // pad, and put back performance / Hz / DND (review 2026-09-25: they kept running)
             InputMonitor.send("A -"); InputMonitor.send("F - -")

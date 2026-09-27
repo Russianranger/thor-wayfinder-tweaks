@@ -66,10 +66,12 @@ object RootInjector {
 
     // ── keys ────────────────────────────────────────────────────────────
     private val downTimes = HashMap<Int, Long>()
+    private val keyDisplays = HashMap<Int, Int>()
 
     private fun key(code: Int, down: Boolean, meta: Int, displayId: Int) {
         val now = SystemClock.uptimeMillis()
         val downTime = if (down) now.also { downTimes[code] = it } else downTimes.remove(code) ?: now
+        if (down) keyDisplays[code] = displayId else keyDisplays.remove(code)
         val ev = KeyEvent(
             downTime, now, if (down) KeyEvent.ACTION_DOWN else KeyEvent.ACTION_UP, code, 0, meta,
             KeyCharacterMap.VIRTUAL_KEYBOARD, 0, 0, InputDevice.SOURCE_KEYBOARD,
@@ -79,6 +81,13 @@ object RootInjector {
         runCatching { m.invoke(im, ev, 0 /* INJECT_INPUT_EVENT_MODE_ASYNC */) }
             .onSuccess { if (down && BuildConfig.DEBUG) Log.d(TAG, "key $code → display $displayId") }
             .onFailure { Log.w(TAG, if (BuildConfig.DEBUG) "inject key $code: ${it.cause ?: it}" else "inject key failed: ${(it.cause ?: it).javaClass.simpleName}") }
+    }
+
+    /** Called only on helper shutdown; the deck's `R` command remains mouse-only. */
+    fun releaseKeys() {
+        for (code in downTimes.keys.toList().reversed())
+            runCatching { key(code, false, 0, keyDisplays[code] ?: -1) }
+        downTimes.clear(); keyDisplays.clear()
     }
 
     // ── mouse (virtual uinput device) ───────────────────────────────────

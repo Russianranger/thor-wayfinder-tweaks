@@ -18,7 +18,7 @@ import android.util.Log
 object InputMonitor {
 
     private const val TAG = "ThorInput"
-    private const val SOCK = "app.wayfinder.input"
+    private const val SOCK = BuildConfig.APPLICATION_ID + ".input"
     /** The root helper's own stdout/stderr: kept only in debug builds (and never in a shared
      *  place like /data/local/tmp, where root would follow a planted symlink). */
     private val HELPER_LOG get() = if (BuildConfig.DEBUG) "/data/local/tmp/thor_input_helper.log" else "/dev/null"
@@ -97,6 +97,8 @@ object InputMonitor {
     /** Input layer: (printed evdev code, 1 = down / 0 = up) of a button the current app's remap
      *  sends to Wayfinder — a keyboard key or a Wayfinder action ([PadRemap]). */
     @Volatile var extListener: ((Int, Int) -> Unit)? = null
+    /** Normalized physical stick axes after shaping / gating, before swap and inversion. */
+    @Volatile var sticksListener: ((Int, Int, Int, Int) -> Unit)? = null
     /** Stick lights: average screen colour from the helper's [AmbientSampler] (`C r g b`). */
     @Volatile var ambientListener: ((Int) -> Unit)? = null
     /** A (new) helper is connected: it knows nothing yet — re-send what it should be doing
@@ -137,6 +139,7 @@ object InputMonitor {
         // (launched while the first was slow to connect) sits in the accept backlog and never
         // gets it — it used to run its startup anyway and kill the live input layer (review).
         send("H")
+        ExtEngine.helperConnected()
         onHelperConnected?.invoke()
         try {
             val br = client.inputStream.bufferedReader()
@@ -157,6 +160,12 @@ object InputMonitor {
                 if (p[0] == "X" && p.size == 3) {   // input layer: a button mapped to a keyboard key / action
                     val c = p[1].toIntOrNull(); val v = p[2].toIntOrNull()
                     if (c != null && v != null) extListener?.invoke(c, v)
+                    continue
+                }
+                if (p[0] == "S" && p.size == 5) {
+                    val axes = p.drop(1).map { it.toIntOrNull() }
+                    if (axes.all { it != null && it in -32767..32767 })
+                        sticksListener?.invoke(axes[0]!!, axes[1]!!, axes[2]!!, axes[3]!!)
                     continue
                 }
                 if (p[0] == "D" && p.size >= 2) {   // which game an app runs: D <pkg> [<game-id> <title…>]
@@ -189,7 +198,11 @@ object InputMonitor {
                 if (BuildConfig.DEBUG && (++count <= 5 || count % 100 == 0)) Log.d(TAG, "event #$count: $line")
             }
         } catch (e: Exception) { Log.w(TAG, "read: ${e.message}") }
-        finally { clientConnected = false; clientOut = null; try { client.close() } catch (_: Exception) {} }
+        finally {
+            clientConnected = false; clientOut = null
+            ExtEngine.releaseAll()
+            try { client.close() } catch (_: Exception) {}
+        }
         Log.d(TAG, "client ended after $count events")
         PadLayerCtl.onStatus("stopped (helper gone)")
         relaunchSoon()

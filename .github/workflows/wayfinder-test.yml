@@ -1,0 +1,77 @@
+name: Wayfinder test APK
+
+on:
+  push:
+    branches: [ci/stick-mapping, wayfinder-test]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: wayfinder-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Install Android toolchain
+        run: sdkmanager 'platforms;android-34' 'build-tools;34.0.0' 'ndk;27.2.12479018'
+      # Keep successive test APKs update-compatible. A cache eviction can require uninstalling
+      # the test app before installing a later build; the upstream app has a separate package.
+      # This is a debug-only key, never a production signing key or a release attachment.
+      - name: Restore test signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: wayfinder-test-debug-signing-v1
+      - name: Test native mapping engine
+        run: bash tools/build_wfpad.sh host-test
+      - name: Build Android input helper from source
+        env:
+          ANDROID_NDK_VERSION: 27.2.12479018
+        run: bash tools/build_wfpad.sh
+      - name: Test and assemble APK
+        run: bash gradlew --no-daemon -Pminify -PwayfinderTestVersionCode=$((1000 + GITHUB_RUN_NUMBER)) :app:testDebugUnitTest :app:assembleDebug
+      - name: Prepare APK and checksum
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/app-debug.apk dist/wayfinder-test.apk
+          cd dist
+          sha256sum wayfinder-test.apk > wayfinder-test.apk.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wayfinder-test
+          path: |
+            dist/wayfinder-test.apk
+            dist/wayfinder-test.apk.sha256
+          if-no-files-found: error
+      - name: Publish wayfinder test
+        if: github.ref == 'refs/heads/wayfinder-test'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > dist/release-notes.md <<'NOTES'
+          Test build with individually configurable left/right analog stick directions and mouse cursor directions.
+
+          Install **wayfinder-test.apk**. It appears as **Wayfinder Test** and uses the separate `app.wayfinder.test` package, so it can be installed alongside the original. Enable only one Wayfinder accessibility/input service at a time. The test app has its own settings and permissions.
+
+          In Game controls, choose either stick's direction mapping and assign each direction to a keyboard key or mouse movement. Test diagonal input and return to center to check keys release and the cursor stops.
+
+          Built from the source commit linked to this release after native mapping tests and JVM tests passed. On-device testing is still required. Debug signing is reused through the CI cache; if that cache is evicted, a later test build may require uninstalling the previous test app first (back up its settings beforehand).
+          NOTES
+          gh release create "wayfinder-test-${GITHUB_RUN_NUMBER}" \
+            --target "$GITHUB_SHA" --title 'wayfinder test' --prerelease \
+            --notes-file dist/release-notes.md \
+            dist/wayfinder-test.apk dist/wayfinder-test.apk.sha256

@@ -96,22 +96,30 @@ import kotlin.math.hypot
 /** Selectable controls on the map, in the design's units (geometry of gen_remap_mockup.py).
  *  Tag: where "what it becomes" is drawn — [tagX] is the tag's start (align 1) or end (−1). */
 private enum class MapCtl(val src: ThorButton?, val x: Float, val y: Float, val r: Float,
-                          val tagX: Float, val tagY: Float, val align: Int) {
+                          val tagX: Float, val tagY: Float, val align: Int, val direction: StickDirection? = null) {
     L2(ThorButton.L2, 141f, -130f, 60f, 256f, -130f, 1), L1(ThorButton.L1, 141f, -69f, 60f, 256f, -69f, 1),
     R2(ThorButton.R2, 1339f, -130f, 60f, 1224f, -130f, -1), R1(ThorButton.R1, 1339f, -69f, 60f, 1224f, -69f, -1),
     SELECT(ThorButton.SELECT, 285f, 80f, 34f, 322f, 80f, 1), START(ThorButton.START, 1195f, 80f, 34f, 1158f, 80f, -1),
-    L3(ThorButton.L3, 178f, 240f, 118f, 312f, 240f, 1),
+    L3(ThorButton.L3, 178f, 240f, 60f, 312f, 240f, 1),
+    LU(null, 178f, 144f, 25f, 312f, 144f, 1, StickDirection.LU),
+    LD(null, 178f, 336f, 25f, 312f, 336f, 1, StickDirection.LD),
+    LL(null, 82f, 240f, 25f, 312f, 240f, 1, StickDirection.LL),
+    LR(null, 274f, 240f, 25f, 312f, 240f, 1, StickDirection.LR),
     X(ThorButton.X, 1302f, 156f, 44f, 1466f, 150f, 1), Y(ThorButton.Y, 1218f, 240f, 44f, 1160f, 240f, -1),
     A(ThorButton.A, 1386f, 240f, 44f, 1466f, 240f, 1), B(ThorButton.B, 1302f, 324f, 44f, 1466f, 330f, 1),
-    DPAD(null, 178f, 522f, 112f, 312f, 522f, 1), R3(ThorButton.R3, 1302f, 522f, 118f, 1466f, 522f, 1),
+    DPAD(null, 178f, 522f, 112f, 312f, 522f, 1), R3(ThorButton.R3, 1302f, 522f, 60f, 1466f, 522f, 1),
+    RU(null, 1302f, 426f, 25f, 1466f, 426f, 1, StickDirection.RU),
+    RD(null, 1302f, 618f, 25f, 1466f, 618f, 1, StickDirection.RD),
+    RL(null, 1206f, 522f, 25f, 1466f, 522f, 1, StickDirection.RL),
+    RR(null, 1398f, 522f, 25f, 1466f, 522f, 1, StickDirection.RR),
     /** The gyro: a wide pill in the drawing's screen (its state is written inside it). */
     GYRO(null, 740f, 600f, 60f, 740f, 600f, 1);
 
-    val title get() = src?.let { if (it == ThorButton.L3) "Left stick (L3)" else if (it == ThorButton.R3) "Right stick (R3)" else it.label }
+    val title get() = direction?.label ?: src?.let { if (it == ThorButton.L3) "Left stick click (L3)" else if (it == ThorButton.R3) "Right stick click (R3)" else it.label }
         ?: if (this == GYRO) "Gyro" else "D-pad"
 }
 
-private enum class Popup { BIND, DPAD, GYRO, CHANGES, PRESETS, CHORDS, APPS, PERF, MORE }
+private enum class Popup { BIND, STICK, DPAD, GYRO, CHANGES, PRESETS, CHORDS, APPS, PERF, MORE }
 private enum class Tab(val label: String) { CONTROLLER("Controller"), KEYBOARD("Keyboard"), MOUSE("Mouse"), ACTIONS("Actions"), MACRO("Macro") }
 
 /** Short words for tags and chips: ⌨ = a keyboard key, 🖱 = the mouse, ★ = a Wayfinder action. */
@@ -213,10 +221,15 @@ fun RemapScreen(myDisplayId: Int, pkg: String, onBack: () -> Unit, inGame: Boole
     }
     fun resetSel() {
         if (sel == MapCtl.GYRO) save(remap.copy(gyro = GyroSettings()))
+        sel.direction?.let { save(remap.copy(stickDirections = remap.stickDirections - it)) }
         sel.src?.let { s -> save(remap.copy(buttons = remap.buttons - s, fire = remap.fire - s, alt = remap.alt - s, shifted = remap.shifted - s)) }
         slot = 0
     }
-    fun openSel() { popup = when (sel) { MapCtl.DPAD -> Popup.DPAD; MapCtl.GYRO -> Popup.GYRO; else -> Popup.BIND }; tab = Tab.CONTROLLER; slot = 0 }
+    fun openSel() {
+        popup = when { sel.direction != null -> Popup.STICK; sel == MapCtl.DPAD -> Popup.DPAD; sel == MapCtl.GYRO -> Popup.GYRO; else -> Popup.BIND }
+        tab = if (sel.direction != null) Tab.KEYBOARD else Tab.CONTROLLER
+        slot = 0
+    }
 
     // "Find a control by pressing it" (map) and "Listen for a button" (popup): the next press
     // is captured (ButtonEngine swallows it, its release too). Home cancels listening.
@@ -277,7 +290,9 @@ fun RemapScreen(myDisplayId: Int, pkg: String, onBack: () -> Unit, inGame: Boole
     /** Everything behind the popup is out of the controller's reach while it's open. */
     val behind = Modifier.focusProperties { canFocus = !open }
     // What the drawing's empty screen says about the selected control.
-    val inspector: Pair<String, String> = sel.src?.let { s ->
+    val inspector: Pair<String, String> = sel.direction?.let { d ->
+        "${d.label} → ${remap.stickDirections[d]?.short() ?: "Analog"}" to "A  change direction   ·   Y  restore analog"
+    } ?: sel.src?.let { s ->
         val t = remap.buttons[s]; val f = remap.fire[s]
         (if (t == null) "${s.label} — as usual" else "${s.label}  →  ${t.short()}") to
             ((f?.let { if (it.hasAlt) "${it.label} → ${remap.alt[s]?.short() ?: "nothing yet"}   ·   " else "${it.label} · " } ?: "") + "A  change   ·   Y  reset")
@@ -299,17 +314,17 @@ fun RemapScreen(myDisplayId: Int, pkg: String, onBack: () -> Unit, inGame: Boole
             if (e.type != KeyEventType.KeyDown || n.repeatCount > 0) return@onPreviewKeyEvent false
             if (open) when (b) {
                 ThorButton.L1, ThorButton.R1 -> {
-                    if (popup == Popup.BIND && !recording) {
-                        val tabs = Tab.values(); val i = (tab.ordinal + if (b == ThorButton.R1) 1 else tabs.size - 1) % tabs.size
+                    if ((popup == Popup.BIND || popup == Popup.STICK) && !recording) {
+                        val tabs = if (popup == Popup.STICK) arrayOf(Tab.KEYBOARD, Tab.MOUSE) else Tab.values(); val i = (tabs.indexOf(tab).coerceAtLeast(0) + if (b == ThorButton.R1) 1 else tabs.size - 1) % tabs.size
                         tab = tabs[i]; listening = false
                     }
                     return@onPreviewKeyEvent true
                 }
                 ThorButton.L2, ThorButton.R2 -> {        // the keyboard's two pages
-                    if (popup == Popup.BIND && tab == Tab.KEYBOARD) { kbPage = if (b == ThorButton.R2) 1 else 0; return@onPreviewKeyEvent true }
+                    if ((popup == Popup.BIND || popup == Popup.STICK) && tab == Tab.KEYBOARD) { kbPage = if (b == ThorButton.R2) 1 else 0; return@onPreviewKeyEvent true }
                     return@onPreviewKeyEvent false
                 }
-                ThorButton.Y -> { if (popup == Popup.BIND || popup == Popup.GYRO) resetSel(); return@onPreviewKeyEvent true }
+                ThorButton.Y -> { if (popup == Popup.BIND || popup == Popup.STICK || popup == Popup.GYRO) resetSel(); return@onPreviewKeyEvent true }
                 else -> return@onPreviewKeyEvent false
             }
             if (b != null && b in PadRemap.SOURCES) live = "${b.label}  →  $label gets  ${(remap.buttons[b] ?: RemapTarget.Button(b)).short()}"
@@ -404,9 +419,17 @@ fun RemapScreen(myDisplayId: Int, pkg: String, onBack: () -> Unit, inGame: Boole
                                 }
                             },
                     )
+                    Row(Modifier.padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        for (left in listOf(true, false)) {
+                            Pill(stickSummary(remap, left), Modifier.weight(1f).then(behind),
+                                selected = sel.direction?.isLeft == left) {
+                                sel = if (left) MapCtl.LU else MapCtl.RU; openSel()
+                            }
+                        }
+                    }
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
-                            live ?: if (picking) "Press the control you want…" else "L1 L2 · R1 R2 are on the back edge",
+                            live ?: if (picking) "Press the control you want…" else "Stick arrows: movement · L3 / R3: click",
                             color = if (live != null || picking) g.accent else g.textSecondary,
                             style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
@@ -431,6 +454,13 @@ fun RemapScreen(myDisplayId: Int, pkg: String, onBack: () -> Unit, inGame: Boole
                             slot = slot, onSlot = { slot = it }, recording = recording, onRecord = { recording = !recording },
                             onTab = { tab = it; listening = false; recording = false }, onListen = { listening = !listening },
                             setTarget = { t -> sel.src?.let { bind(it, t) } }, save = ::save, reset = ::resetSel, close = { popup = null })
+                        Popup.STICK -> StickPopup(sel.direction ?: StickDirection.LU, remap, tab, kbPage, popupFirst,
+                            onDirection = { d -> sel = MapCtl.values().first { it.direction == d } },
+                            onTab = { tab = it }, onPage = { kbPage = it },
+                            setTarget = { target -> sel.direction?.let { d ->
+                                val r = fresh()
+                                save(r.copy(stickDirections = if (target == null) r.stickDirections - d else r.stickDirections + (d to target)))
+                            } }, save = ::save, reset = ::resetSel, close = { popup = null })
                         Popup.APPS -> AppsPanel(pkg, appLabel, popupFirst, onPick = { popup = null; if (it != pkg) onSwitchApp(it) },
                             onAll = { popup = null; onAllApps() }) { popup = null }
                         Popup.CHORDS -> ChordsPanel(remap, popupFirst, chordListen, chordPair, onListen = { chordListen = !chordListen },
@@ -458,6 +488,104 @@ fun RemapScreen(myDisplayId: Int, pkg: String, onBack: () -> Unit, inGame: Boole
 }
 
 // ── the popup ─────────────────────────────────────────────────────────────
+
+private fun stickDirections(left: Boolean) = if (left)
+    listOf(StickDirection.LU, StickDirection.LD, StickDirection.LL, StickDirection.LR)
+else listOf(StickDirection.RU, StickDirection.RD, StickDirection.RL, StickDirection.RR)
+
+private fun StickDirection.arrow() = when (this) {
+    StickDirection.LU, StickDirection.RU -> "↑"
+    StickDirection.LD, StickDirection.RD -> "↓"
+    StickDirection.LL, StickDirection.RL -> "←"
+    StickDirection.LR, StickDirection.RR -> "→"
+}
+
+private fun StickDirection.directionName() = when (this) {
+    StickDirection.LU, StickDirection.RU -> "Up"
+    StickDirection.LD, StickDirection.RD -> "Down"
+    StickDirection.LL, StickDirection.RL -> "Left"
+    StickDirection.LR, StickDirection.RR -> "Right"
+}
+
+private fun RemapTarget?.directionSummary() = when (this) {
+    null -> "Analog"
+    RemapTarget.None -> "Off"
+    is RemapTarget.Mouse -> "Mouse " + when (b) { 5 -> "↑"; 6 -> "↓"; 7 -> "←"; 8 -> "→"; else -> label() }
+    else -> label()
+}
+
+private fun stickSummary(remap: PadRemap, left: Boolean): String =
+    (if (left) "Left stick: " else "Right stick: ") + stickDirections(left).joinToString("  ") {
+        "${it.arrow()} ${remap.stickDirections[it].directionSummary()}"
+    } + "  ›"
+
+/** Analog movement is independent of clicking L3 / R3. Each direction has a held output. */
+@Composable
+private fun StickPopup(direction: StickDirection, remap: PadRemap, tab: Tab, page: Int, first: FocusRequester,
+                       onDirection: (StickDirection) -> Unit, onTab: (Tab) -> Unit, onPage: (Int) -> Unit,
+                       setTarget: (RemapTarget?) -> Unit, save: (PadRemap) -> Unit, reset: () -> Unit, close: () -> Unit) {
+    val g = LocalGlass.current
+    val directions = stickDirections(direction.isLeft)
+    val current = remap.stickDirections[direction]
+    fun preset(targets: List<RemapTarget>?) {
+        val rest = remap.stickDirections - directions.toSet()
+        save(remap.copy(stickDirections = if (targets == null) rest else rest + directions.zip(targets)))
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Analog stick directions", color = g.textPrimary, style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Pill("Reset direction", fill = false, hint = "Y", onClick = reset)
+            Pill("Close", fill = false, hint = "B", onClick = close)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            for (left in listOf(true, false)) Pill(if (left) "Left stick" else "Right stick", Modifier.weight(1f),
+                selected = direction.isLeft == left) {
+                onDirection(stickDirections(left)[directions.indexOf(direction)])
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            for (d in directions) Pill("${d.arrow()} ${d.directionName()} · ${remap.stickDirections[d].directionSummary()}",
+                Modifier.weight(1f), selected = direction == d) { onDirection(d) }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("${direction.label} → ${current?.short() ?: "Original analog"}", color = g.accent,
+                style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Pill("Original analog", selected = current == null, fill = false) { setTarget(null) }
+            Pill("Nothing", selected = current == RemapTarget.None, fill = false) { setTarget(RemapTarget.None) }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Hint("◀ L1", wide = true)
+            TabItem("Keyboard key", tab == Tab.KEYBOARD, Modifier.weight(1f)) { onTab(Tab.KEYBOARD) }
+            TabItem("Mouse movement", tab == Tab.MOUSE, Modifier.weight(1f)) { onTab(Tab.MOUSE) }
+            Hint("R1 ▶", wide = true)
+        }
+        Box(Modifier.fillMaxWidth().weight(1f)) {
+            if (tab == Tab.MOUSE) Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Move the cursor while the stick points this way. Returning to centre stops it.",
+                    color = g.textSecondary, style = MaterialTheme.typography.bodyMedium)
+                listOf("↑ Mouse up", "↓ Mouse down", "← Mouse left", "→ Mouse right").chunked(2).forEachIndexed { rowIndex, row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        row.forEachIndexed { column, text ->
+                            val code = 5 + rowIndex * 2 + column
+                            Pill(text, Modifier.weight(1f), selected = current == RemapTarget.Mouse(code),
+                                focus = if (code == 5) first else null) { setTarget(RemapTarget.Mouse(code)) }
+                        }
+                    }
+                }
+                Text("Any stick direction can move the cursor in any direction. L3 / R3 click mappings are edited separately on the controller map.",
+                    color = g.textTertiary, style = MaterialTheme.typography.bodySmall)
+            } else KeyboardTab(current, page, first, onPage, setTarget, single = true)
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Whole stick", color = g.textSecondary, style = MaterialTheme.typography.labelMedium)
+            Pill("WASD", Modifier.weight(1f)) { preset(listOf(KeyEvent.KEYCODE_W, KeyEvent.KEYCODE_S, KeyEvent.KEYCODE_A, KeyEvent.KEYCODE_D).map { RemapTarget.Key(it) }) }
+            Pill("Arrow keys", Modifier.weight(1f)) { preset(listOf(KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT).map { RemapTarget.Key(it) }) }
+            Pill("Mouse", Modifier.weight(1f)) { preset((5..8).map { RemapTarget.Mouse(it) }) }
+            Pill("Reset stick", Modifier.weight(1f)) { preset(null) }
+        }
+    }
+}
 
 @Composable
 private fun BindPopup(
@@ -511,7 +639,7 @@ private fun BindPopup(
                 Tab.CONTROLLER -> ControllerTab(src, cur, listening, first, remap, onListen, setTarget, save)
                 Tab.KEYBOARD -> Box(rest) { KeyboardTab(cur, kbPage, first, onPage, setTarget) }
                 Tab.MOUSE -> Column(rest.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    SubLabel("A mouse button or the wheel — for PC games (GameNative) and apps with a cursor")
+                    SubLabel("Mouse buttons, wheel or cursor movement — for PC games (GameNative) and apps with a cursor")
                     RemapTarget.MOUSE_NAMES.chunked(3).forEachIndexed { r, row ->
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             row.forEachIndexed { i, name ->
@@ -676,6 +804,7 @@ private fun ChangesPanel(remap: PadRemap, first: FocusRequester, save: (PadRemap
         PanelTitle("Changes", onClose, first)
         if (remap.isEmpty) Text("Nothing changed — every control does what the Thor sends.", color = g.textSecondary, style = MaterialTheme.typography.bodySmall)
         remap.buttons.forEach { (b, t) -> ChangeRow("${b.label}  →  ${t.short()}") { save(remap.copy(buttons = remap.buttons - b)) } }
+        remap.stickDirections.forEach { (d, t) -> ChangeRow("${d.label}  →  ${t.short()}") { save(remap.copy(stickDirections = remap.stickDirections - d)) } }
         remap.fire.forEach { (b, f) -> ChangeRow("${b.label}  fires: ${f.label.lowercase()}") { save(remap.copy(fire = remap.fire - b)) } }
         if (remap.swapSticks) ChangeRow("Sticks swapped") { save(remap.copy(swapSticks = false)) }
         if (remap.invertLeftY) ChangeRow("Left stick inverted") { save(remap.copy(invertLeftY = false)) }
@@ -920,14 +1049,19 @@ private fun kc(name: String) = KeyEvent.keyCodeFromString("KEYCODE_$name")
 private val ARROWS = setOf("↑", "↓", "←", "→")
 
 @Composable
-private fun KeyboardTab(cur: RemapTarget?, page: Int, first: FocusRequester, onPage: (Int) -> Unit, setTarget: (RemapTarget?) -> Unit) {
+private fun KeyboardTab(cur: RemapTarget?, page: Int, first: FocusRequester, onPage: (Int) -> Unit, setTarget: (RemapTarget?) -> Unit,
+                        single: Boolean = false) {
     val g = LocalGlass.current
     val keys: List<Int> = when (cur) { is RemapTarget.Keys -> cur.codes; is RemapTarget.Key -> cur.asCodes(); else -> emptyList() }
     fun set(list: List<Int>) = setTarget(if (list.isEmpty()) null else RemapTarget.Keys(list, (cur as? RemapTarget.Keys)?.inOrder == true))
-    val toggle: (Int) -> Unit = { code -> set(if (code in keys) keys - code else (keys + code).take(6)) }
+    val toggle: (Int) -> Unit = { code ->
+        if (single) setTarget(RemapTarget.Key(code)) else set(if (code in keys) keys - code else (keys + code).take(6))
+    }
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         // the chosen keys, in order
-        Row(Modifier.height(30.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (single) Text("Pick a key to hold while the stick points this way. Returning to centre releases it.",
+            color = g.textSecondary, style = MaterialTheme.typography.labelMedium)
+        else Row(Modifier.height(30.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("Keys", color = g.textSecondary, style = MaterialTheme.typography.labelMedium, modifier = Modifier.width(36.dp))
             if (keys.isEmpty()) Text("Pick one or more keys — held together, pressed in this order",
                 color = g.textSecondary, style = MaterialTheme.typography.labelMedium)
@@ -1540,7 +1674,7 @@ private fun mapHit(p: Offset, w: Float, h: Float): MapCtl? {
     val (k, ox, oy) = mapScale(w, h)
     val ux = (p.x - ox) / k; val uy = (p.y - oy) / k
     if (abs(ux - MapCtl.GYRO.x) < 175f && abs(uy - MapCtl.GYRO.y) < 45f) return MapCtl.GYRO
-    return MapCtl.values().filter { hypot(it.x - ux, it.y - uy) < maxOf(it.r * 1.25f, 70f) }
+    return MapCtl.values().filter { hypot(it.x - ux, it.y - uy) < if (it.direction != null) 42f else maxOf(it.r * 1.1f, 50f) }
         .minByOrNull { hypot(it.x - ux, it.y - uy) }
 }
 
@@ -1577,8 +1711,11 @@ private fun ControllerMap(remap: PadRemap, sel: MapCtl, focused: Boolean, inspec
             if (fill != null) drawRoundRect(fill, Offset(X(x), Y(y)), Size(w * k, h * k), CornerRadius(r * k), style = Fill)
             drawRoundRect(stroke.copy(alpha = a), Offset(X(x), Y(y)), Size(w * k, h * k), CornerRadius(r * k), style = Stroke(sw * k))
         }
-        fun label(s: String, cx: Float, cy: Float, sz: Float, color: Color = ink, bold: Boolean = true) {
-            val l = tm.measure(s, TextStyle(fontSize = (sz * k / density).sp, color = color, fontWeight = if (bold) FontWeight.SemiBold else FontWeight.Normal))
+        fun label(s: String, cx: Float, cy: Float, sz: Float, color: Color = ink, bold: Boolean = true, maxWidth: Float? = null) {
+            val style = TextStyle(fontSize = (sz * k / density).sp, color = color, fontWeight = if (bold) FontWeight.SemiBold else FontWeight.Normal)
+            val full = tm.measure(s, style)
+            val l = if (maxWidth != null && full.size.width > maxWidth * k)
+                tm.measure(s, style.copy(fontSize = (sz * k / density * maxWidth * k / full.size.width).sp)) else full
             drawText(l, topLeft = Offset(X(cx) - l.size.width / 2f, Y(cy) - l.size.height / 2f))
         }
         val changed = { c: MapCtl -> when (c) {
@@ -1587,7 +1724,7 @@ private fun ControllerMap(remap: PadRemap, sel: MapCtl, focused: Boolean, inspec
             MapCtl.R3 -> remap.buttons.containsKey(ThorButton.R3) || remap.invertRightY || remap.swapSticks
             MapCtl.L2, MapCtl.R2 -> remap.buttons.containsKey(c.src) || remap.fire.containsKey(c.src) || remap.digitalTriggers
             MapCtl.GYRO -> remap.gyro.isOn
-            else -> remap.buttons.containsKey(c.src) || remap.fire.containsKey(c.src)
+            else -> if (c.direction != null) remap.stickDirections.containsKey(c.direction) else remap.buttons.containsKey(c.src) || remap.fire.containsKey(c.src)
         } }
         // a changed control: its label in the accent colour (the tag says what it does)
         fun labelColor(c: MapCtl) = if (changed(c)) accText else ink
@@ -1624,8 +1761,12 @@ private fun ControllerMap(remap: PadRemap, sel: MapCtl, focused: Boolean, inspec
         for (c in listOf(MapCtl.L3, MapCtl.R3)) {
             circle(c.x, c.y, 118f, 4f, .5f, face.copy(alpha = face.alpha * .5f))
             drawCircle(RING.copy(alpha = .75f), 103f * k, Offset(X(c.x), Y(c.y)), style = Stroke(8f * k))
-            circle(c.x, c.y, 76f, 6f, .9f)
-            label(c.src!!.label, c.x, c.y, 48f, labelColor(c))
+            circle(c.x, c.y, 56f, 6f, .9f)
+            label(c.src!!.label, c.x, c.y, 42f, labelColor(c))
+        }
+        for (c in MapCtl.values().filter { it.direction != null }) {
+            circle(c.x, c.y, 24f, 3f, .8f, if (changed(c)) ACC else face, if (changed(c)) ACC else ink)
+            label(c.direction!!.arrow(), c.x, c.y - 1f, 34f, if (changed(c)) Color.White else ink)
         }
         // D-pad, with its arrows
         val LX = 178f; val LOW = 522f; val aw = 31f; val R = 104f
@@ -1676,11 +1817,12 @@ private fun ControllerMap(remap: PadRemap, sel: MapCtl, focused: Boolean, inspec
                 drawRoundRect(ACC, Offset(left - 7f * k, top - 7f * k), Size(w + 14f * k, hh + 14f * k), CornerRadius(hh), style = Stroke(6f * k))
             }
         }
-        label(inspector.first, CX, 350f, 64f, accText)
-        label(inspector.second, CX, 440f, 36f, ink.copy(alpha = .7f), bold = false)
+        label(inspector.first, CX, 350f, 64f, accText, maxWidth = 690f)
+        label(inspector.second, CX, 440f, 36f, ink.copy(alpha = .7f), bold = false, maxWidth = 690f)
 
         // tags: what a changed control now does, joined to it by a dotted line
         for (c in MapCtl.values()) {
+            if (c.direction != null) continue // Direction outputs are shown in the inspector and the two summaries below the map.
             val fire = c.src?.let { s -> remap.fire[s]?.let { " · " + if (it.hasAlt) "${it.label.lowercase()} → ${remap.alt[s]?.short() ?: "?"}" else it.label } } ?: ""
             val becomes = c.src != null && remap.buttons[c.src] != null
             val text = when {
@@ -1720,7 +1862,7 @@ private fun ControllerMap(remap: PadRemap, sel: MapCtl, focused: Boolean, inspec
                 drawRoundRect(ACC, Offset(X(sel.x - 101f), Y(sel.y - t)), Size(202f * k, h * k), CornerRadius(29f * k), style = Stroke(6f * k))
             }
             else -> {
-                val r = when (sel) { MapCtl.DPAD -> 122f; MapCtl.L3, MapCtl.R3 -> 90f; MapCtl.SELECT, MapCtl.START -> 36f; else -> 52f }
+                val r = when { sel.direction != null -> 32f; sel == MapCtl.DPAD -> 122f; sel == MapCtl.L3 || sel == MapCtl.R3 -> 65f; sel == MapCtl.SELECT || sel == MapCtl.START -> 36f; else -> 52f }
                 if (glow) drawCircle(ACC.copy(alpha = .28f), (r + 7f) * k, Offset(X(sel.x), Y(sel.y)), style = Stroke(16f * k))
                 drawCircle(ACC, r * k, Offset(X(sel.x), Y(sel.y)), style = Stroke(6f * k))
             }

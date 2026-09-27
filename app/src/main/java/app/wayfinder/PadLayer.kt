@@ -412,12 +412,12 @@ object PadLayer {
                             onCloneChanged?.invoke()
                         }
                     }
-                    "S" -> { busyUntil.set(System.currentTimeMillis() + 15_000); cloneNode.get()?.let { runCatching { hideOthers(it) } }; status("source ${f.drop(1).joinToString(" ")}") }
+                    "D" -> { busyUntil.set(System.currentTimeMillis() + 15_000); cloneNode.get()?.let { runCatching { hideOthers(it) } }; status("source ${f.drop(1).joinToString(" ")}") }
                     "W" -> status("waiting for AYN's pad")
                     "L" -> status("latency $line")      // L n p50 p99 max (µs)
                     // withheld from the game (Home/Back held): to the app, for its shortcuts
-                    // X = a button mapped to a key / action; V = a watched control (gyro on / off)
-                    "J", "X", "V" -> send?.invoke("$line\n")
+                    // X = mapped button; S = mapped physical sticks; V = watched control (gyro on / off)
+                    "J", "X", "S", "V" -> send?.invoke("$line\n")
                     "M" -> if (f.getOrNull(1) != "ok") status("error profile-refused")
                     else -> status("wfpad $line")
                 }
