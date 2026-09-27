@@ -58,6 +58,7 @@ object PadLayerCtl {
     fun set(ctx: Context, on: Boolean) {
         init(ctx)
         wanted = on
+        if (!on) ExtEngine.releaseAll()
         prefs?.edit()?.putBoolean(KEY, on)?.apply()
         apply(ctx)
     }
@@ -101,5 +102,6 @@ object PadLayerCtl {
             }
             line == "off" || line.startsWith("stopped") || line.startsWith("error") -> active = false
         }
+        if (!active) ExtEngine.releaseAll()
     }
 }

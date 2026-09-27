@@ -30,6 +30,7 @@ static int ev(int type, int code, int value) { int p; return wf_event(&S, type, 
 static int key(int code, int v) { return ev(EV_KEY, code, v); }
 static int ab(int code, int v) { return ev(EV_ABS, code, v); }
 static void frame(void) { wf_compute(&S, &M, &O); }
+static void map_sticks(int dirs) { M.stick_dirs = (unsigned char)dirs; wf_stick_rearm(&S, &M); }
 
 int main(void) {
     // ── passthrough ───────────────────────────────────────────────
@@ -218,6 +219,120 @@ int main(void) {
     CHECK(O.key[WF_A], "a Shift-layer button press (virtual) reaches the game while shift is held");
     pad(0); key(WF_HOME, 1); wf_vpress(&S, WF_A, 1); frame();
     CHECK(!O.key[WF_A], "virtual presses stay silent while Home is held");
+
+    // ── physical stick direction mappings ─────────────────────────
+    { const int axes[] = {WF_LY, WF_LY, WF_LX, WF_LX, WF_RY, WF_RY, WF_RX, WF_RX};
+      const int slots[] = {1, 1, 0, 0, 3, 3, 2, 2};
+      int v[4];
+      for (int d = 0; d < 8; d++) {
+          pad(0); map_sticks(1 << d);
+          int a = axes[d], value = d % 2 ? 32767 : -32767;
+          ab(a, value); frame(); wf_ext_sticks(&S, &M, v);
+          CHECK(O.abs[a] == 0 && v[slots[d]] == value, "direction %d: external mapping receives the suppressed half-axis", d);
+          ab(a, -value); frame(); wf_ext_sticks(&S, &M, v);
+          CHECK(O.abs[a] == -value && v[slots[d]] == -value, "direction %d: opposite unmapped half-axis passes", d);
+          int other = a == WF_LX ? WF_LY : WF_LX;
+          ab(other, 12345); frame();
+          CHECK(O.abs[other] == 12345, "direction %d: unrelated axis passes", d);
+      }
+      pad(0); map_sticks(255); ab(WF_LX, 21000); ab(WF_LY, -22000); ab(WF_RX, -23000); ab(WF_RY, 24000);
+      frame(); wf_ext_sticks(&S, &M, v);
+      CHECK(O.abs[WF_LX] == 0 && O.abs[WF_LY] == 0 && O.abs[WF_RX] == 0 && O.abs[WF_RY] == 0,
+            "all eight mapped directions suppress both controller sticks");
+      CHECK(v[0] == 21000 && v[1] == -22000 && v[2] == -23000 && v[3] == 24000,
+            "external protocol preserves physical LX LY RX RY order and diagonal values");
+
+      pad(0); map_sticks(1); M.swap_sticks = 1; M.inv_ry = 1;
+      ab(WF_LY, -30000); ab(WF_LX, 12000); frame(); wf_ext_sticks(&S, &M, v);
+      CHECK(O.abs[WF_RY] == 0 && O.abs[WF_RX] == 12000 && v[0] == 12000 && v[1] == -30000,
+            "physical left-up mapping suppresses before swap and inversion; S stays physical");
+      ab(WF_LY, 30000); frame(); wf_ext_sticks(&S, &M, v);
+      CHECK(O.abs[WF_RY] == -30000 && v[1] == 30000, "unmapped left-down still swaps and inverts");
+
+      pad(0); map_sticks(1); M.dpad_ls = 1; ab(WF_LY, -30000); ab(WF_HX, 1); frame(); wf_ext_sticks(&S, &M, v);
+      CHECK(O.abs[WF_HY] == 0 && O.abs[WF_LX] == 32767 && v[1] == -30000,
+            "mapped left-up never leaks into D-pad conversion; physical D-pad still drives left stick");
+      ab(WF_LY, 30000); frame(); CHECK(O.abs[WF_HY] == 1, "unmapped left-down still drives the D-pad");
+
+      pad(0); map_sticks(8); M.dz[0] = 10; M.cv[0] = 1; ab(WF_LX, 2000); wf_ext_sticks(&S, &M, v);
+      CHECK(v[0] == 0, "mapped stick stream uses the physical stick's deadzone");
+      ab(WF_LX, 16384); wf_ext_sticks(&S, &M, v);
+      CHECK(v[0] > 6400 && v[0] < 6500, "mapped stream applies deadzone then precise response (%d)", v[0]);
+      S.gyro_stick = 1; S.gyro_x = 5000; frame(); wf_ext_sticks(&S, &M, v);
+      CHECK(O.abs[WF_LX] == 5000 && v[0] < 6500, "gyro remains separate from physical direction mappings");
+
+      // Unsigned and asymmetric ranges normalize without a center offset or endpoint loss.
+      pad(0); S.info[WF_LX].minimum = 0; S.info[WF_LX].maximum = 255; wf_state_rest(&S); map_sticks(12);
+      wf_ext_sticks(&S, &M, v); CHECK(v[0] == 0, "unsigned-axis rest normalizes to zero");
+      ab(WF_LX, 0); wf_ext_sticks(&S, &M, v); CHECK(v[0] == -32767, "unsigned minimum normalizes to -32767");
+      ab(WF_LX, 255); wf_ext_sticks(&S, &M, v); CHECK(v[0] == 32767, "unsigned maximum normalizes to 32767");
+      ab(WF_LX, 191); wf_ext_sticks(&S, &M, v); CHECK(v[0] == 16383, "unsigned half-deflection normalizes to 50%%");
+      pad(0); S.info[WF_RX].minimum = -32768; map_sticks(192);
+      ab(WF_RX, -32768); wf_ext_sticks(&S, &M, v); CHECK(v[2] == -32767, "signed asymmetric minimum normalizes to -32767");
+      ab(WF_RX, 50000); wf_ext_sticks(&S, &M, v); CHECK(v[2] == 32767, "external values clamp to normalized range");
+
+      // Pre-held external mappings release at a gate and wait for rest, without changing
+      // the established restore behavior of ordinary controller axes.
+      pad(0); map_sticks(12); ab(WF_LX, 30000); ab(WF_RY, 20000); wf_ext_sticks(&S, &M, v);
+      CHECK(v[0] == 30000, "mapped direction active before gate");
+      key(WF_HOME, 1); wf_ext_sticks(&S, &M, v);
+      CHECK(v[0] == 0 && v[3] == 0, "Home immediately releases the mapped stream");
+      key(WF_HOME, 0); frame(); wf_ext_sticks(&S, &M, v);
+      CHECK(v[0] == 0 && O.abs[WF_RY] == 20000, "mapped hold waits for rest after gate; ordinary held axis resumes");
+      ab(WF_LX, -30000); wf_ext_sticks(&S, &M, v);
+      CHECK(v[0] == -30000, "direct reversal releases old mapped half and engages opposite direction");
+      ab(WF_LX, 0); ab(WF_LX, 30000); wf_ext_sticks(&S, &M, v);
+      CHECK(v[0] == 30000, "rest then movement re-arms the original direction");
+      key(WF_BACK, 1); ab(WF_LX, -30000); wf_ext_sticks(&S, &M, v);
+      CHECK(v[0] == 0, "Back gates mapped directions too");
+      key(WF_BACK, 0); wf_ext_sticks(&S, &M, v);
+      CHECK(v[0] == 0, "direction moved during Back stays blocked after release");
+
+      pad(0); map_sticks(16); key(WF_HOME, 1); ab(WF_RY, -30000); key(WF_HOME, 0); wf_ext_sticks(&S, &M, v);
+      CHECK(v[3] == 0, "consumed stick direction remains silent after Home");
+      ab(WF_RY, 0); wf_ext_sticks(&S, &M, v); ab(WF_RY, -30000); wf_ext_sticks(&S, &M, v);
+      CHECK(v[3] == -30000, "consumed direction works after return to rest");
+
+      pad(0); map_sticks(8); M.shift = 0x13a; S.shift = M.shift;
+      key(M.shift, 1); ab(WF_LX, 30000); key(M.shift, 0); frame(); wf_ext_sticks(&S, &M, v);
+      CHECK(v[0] == 0 && S.shift_tap_until == 0, "shift consumes stick movement and does not generate a lone button tap");
+      ab(WF_LX, 0); wf_ext_sticks(&S, &M, v); ab(WF_LX, 30000); wf_ext_sticks(&S, &M, v);
+      CHECK(v[0] == 30000, "mapped stick works after shift and return to rest");
+
+      pad(0); ab(WF_LX, 30000); map_sticks(8); wf_ext_sticks(&S, &M, v);
+      CHECK(v[0] == 0, "activating a profile while a mapped direction is held waits for rest");
+      ab(WF_LX, 0); wf_ext_sticks(&S, &M, v); ab(WF_LX, 30000); wf_ext_sticks(&S, &M, v);
+      CHECK(v[0] == 30000, "profile's mapped direction engages after rest");
+      wf_stick_rearm(&S, &M); wf_ext_sticks(&S, &M, v);
+      CHECK(v[0] == 0, "changing a target with the same direction mask releases the previous hold");
+      map_sticks(0); frame(); wf_ext_sticks(&S, &M, v);
+      CHECK(v[0] == 0 && v[1] == 0 && v[2] == 0 && v[3] == 0 && O.abs[WF_LX] == 30000,
+            "mapping removal emits all-zero external state and restores ordinary analog output");
+      ab(WF_LX, 0); map_sticks(8); ab(WF_LX, 30000); wf_state_rest(&S); wf_ext_sticks(&S, &M, v);
+      CHECK(v[0] == 0 && v[1] == 0 && v[2] == 0 && v[3] == 0, "source loss releases all external stick state");
+
+      pad(0); M.cv[0] = 2; map_sticks(8); ab(WF_LX, 7000); wf_ext_sticks(&S, &M, v);
+      CHECK(v[0] > 15000, "fast response turns a sub-25%% raw hold into an active mapped direction");
+      key(WF_HOME, 1); key(WF_HOME, 0); wf_ext_sticks(&S, &M, v);
+      CHECK(v[0] == 0, "fast response hold stays released even when the whole gate fits in one frame");
+      ab(WF_LX, 2000); wf_ext_sticks(&S, &M, v);
+      CHECK(v[0] == 0, "fast response remains blocked while shaped value is outside cursor neutral zone");
+      ab(WF_LX, 500); wf_ext_sticks(&S, &M, v); ab(WF_LX, 7000); wf_ext_sticks(&S, &M, v);
+      CHECK(v[0] > 15000, "shaped cursor neutral zone re-arms a fast-response mapped direction");
+      M.dz[0] = 10; ab(WF_LX, 30000); wf_stick_rearm(&S, &M);
+      ab(WF_LX, 2500); wf_ext_sticks(&S, &M, v); ab(WF_LX, 30000); wf_ext_sticks(&S, &M, v);
+      CHECK(v[0] > 30000, "configured deadzone counts as rest even with nonzero physical drift");
+    }
+    pad(0);
+    CHECK(wf_parse(&M, &S, "sd=255 sw=1") == 0 && M.stick_dirs == 255 && M.swap_sticks,
+          "parse all eight direction bits with other options");
+    before = M;
+    CHECK(wf_parse(&M, &S, "sd=-1") != 0 && wf_parse(&M, &S, "sd=256") != 0 && wf_parse(&M, &S, "sd=x") != 0,
+          "bad direction masks refused");
+    CHECK(!memcmp(&M, &before, sizeof M), "refused direction mask preserves the current profile");
+    CHECK(wf_parse(&M, &S, "sd=0") == 0 && M.stick_dirs == 0, "sd=0 disables all mappings");
+    CHECK(wf_parse(&M, &S, "sd=5") == 0 && wf_parse(&M, &S, "L=n") == 0 && M.stick_dirs == 0,
+          "legacy profiles without sd retain default analog behavior");
 
     printf("%s: %d checks, %d failed\n", fails ? "FAILED" : "OK", checks, fails);
     return fails != 0;

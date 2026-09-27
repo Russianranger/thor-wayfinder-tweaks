@@ -23,13 +23,15 @@
 //
 // stdout, one line each:  "A <name>"         armed, waiting for AYN's pad to go (takeover)
 //                         "R <name> <eventN>" copy created (its node)
-//                         "S <name> <eventN>" a (new) AYN pad grabbed as the source
+//                         "D <name> <eventN>" a (new) AYN pad grabbed as the source
 //                         "W"                 source gone, copy kept, waiting for AYN's next pad
 //                         "L <n> <p50_us> <p99_us> <max_us>"  every 5 s: added latency
 //                         "J <type> <code> <value>"  an event withheld from the game (gate):
 //                                             for Wayfinder's shortcuts; keys as PRINTED codes
 //                         "X <code> <1|0>"    a button mapped to a keyboard key / action
 //                                             (printed code): Wayfinder performs it
+//                         "S <lx> <ly> <rx> <ry>" physical shaped/gated sticks, -32767..32767
+//                                             while direction mappings are active, on change
 //                         "M ok|bad"          answer to a profile line
 //                         "E <reason>"        fatal; then exit: 2 = no source for 10 s,
 //                                             4 = takeover: AYN's pad never went away,
@@ -184,6 +186,8 @@ static int read_sys(const char *path, char *buf, size_t n) {
 static wf_state S;                // AYN's pad (current source), printed codes
 static wf_map M;                  // the app's profile (kept across sources and copies)
 static wf_out OUT;                // what the copy currently shows
+static int STICKS[4];              // last normalized physical sticks sent to Wayfinder
+static unsigned char stick_mask;  // last emitted profile mask (also detects mapping removal)
 
 /** Capabilities + current state of a (new) source. */
 static void init_state(int fd) {
@@ -204,6 +208,7 @@ static void init_state(int fd) {
     S.shift = M.shift;
     ioctl(fd, EVIOCGKEY(sizeof ks), ks);
     for (int i = 0; i < S.nk; i++) if (TEST(S.keys[i], ks)) { int p; wf_event(&S, EV_KEY, S.keys[i], 1, &p); }
+    wf_stick_rearm(&S, &M);
 }
 
 /** Events were dropped (SYN_DROPPED): re-read the pad's state, but keep what Wayfinder set —
@@ -220,6 +225,11 @@ static void resync_state(int fd) {
 
 /** Write the copy's new state: only what changed (everything after a fresh copy). */
 static void emit(void) {
+    int sticks[4]; wf_ext_sticks(&S, &M, sticks);
+    if ((M.stick_dirs || stick_mask) && (M.stick_dirs != stick_mask || memcmp(STICKS, sticks, sizeof sticks))) {
+        out("S %d %d %d %d", sticks[0], sticks[1], sticks[2], sticks[3]);
+    }
+    memcpy(STICKS, sticks, sizeof sticks); stick_mask = M.stick_dirs;
     if (ufd < 0) return;
     S.now_ms = now_us() / 1000;
     wf_out n; wf_compute(&S, &M, &n);
@@ -264,7 +274,7 @@ static int find_source(void) {
         if (grab && ioctl(fd, EVIOCGRAB, 1) < 0) { close(fd); continue; }
         src = fd; found = 0;
         init_state(fd); emit();
-        out("S %s %s", src_name, e->d_name);
+        out("D %s %s", src_name, e->d_name);
     }
     closedir(d);
     return found;
@@ -313,6 +323,7 @@ static int command(char *line) {
             // a new shift button (or none): the gate follows what's held now
             S.shift = M.shift; S.shift_tap_until = 0;
             S.gated = S.key[WF_HOME] || S.key[WF_BACK] || (S.shift && S.key[S.shift]);
+            wf_stick_rearm(&S, &M);
             emit(); out("M ok");
         }
         else out("M bad");
@@ -359,7 +370,7 @@ int main(int argc, char **argv) {
         if (create_clone() < 0) { out("E create: %s", strerror(errno)); cleanup(); return 1; }
         if (grab && ioctl(src, EVIOCGRAB, 1) < 0) { out("E grab: %s", strerror(errno)); cleanup(); return 1; }
         emit();
-        out("S %s %s", src_name, argv[1] + strlen("/dev/input/"));
+        out("D %s %s", src_name, argv[1] + strlen("/dev/input/"));
     }
     setpriority(PRIO_PROCESS, 0, -10);            // forwarding: ahead of ordinary app threads
 

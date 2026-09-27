@@ -20,7 +20,7 @@ import org.json.JSONObject
  *  - keyboard keys: only [SAFE_KEYS] (letters, digits, F-keys, arrows, Esc, Enter…), modifiers
  *    only Ctrl / Shift / Alt — Android's system keys (Home, Back, app switch, power, volume,
  *    media, search, Win / Meta shortcuts, PrtSc) are REMOVED;
- *  - mouse clicks and wheel: kept;
+ *  - mouse clicks, wheel and cursor directions: kept;
  *  - macros: kept but OFF ([RemapTarget.Macro.armed]) until the user turns each one on.
  * Nothing in a file is ever run as a command; it only becomes a [PadRemap] (whose own parser
  * validates every token) + a face layout. Size-capped; unknown fields ignored.
@@ -189,7 +189,7 @@ object ProfileShare {
             is RemapTarget.Macro -> t.steps.any { hasMod(it.out) }
             else -> false
         }
-        val anyMod = (r.buttons.values + r.alt.values + r.chords.map { it.target } + r.shifted.values).any { hasMod(it) }
+        val anyMod = (r.buttons.values + r.alt.values + r.chords.map { it.target } + r.shifted.values + r.stickDirections.values).any { hasMod(it) }
         fun keep(t: RemapTarget): RemapTarget? = when (t) {
             is RemapTarget.Button, is RemapTarget.Buttons, is RemapTarget.Mouse, RemapTarget.None -> t
             is RemapTarget.Action -> { rep.actions++; null }
@@ -213,7 +213,10 @@ object ProfileShare {
         // a long / double press whose second output was removed falls back to normal
         val fire = r.fire.filter { (k, f) -> !f.hasAlt || k in alt }
         val shifted = r.shifted.mapNotNull { (k, v) -> keep(v)?.let { k to it } }.toMap()
-        return r.copy(buttons = buttons, alt = alt, chords = chords, fire = fire, shifted = shifted)
+        val stickDirections = r.stickDirections.mapNotNull { (k, v) ->
+            keep(v)?.takeIf { PadRemap.isStickTarget(it) }?.let { k to it }
+        }.toMap()
+        return r.copy(buttons = buttons, alt = alt, chords = chords, fire = fire, shifted = shifted, stickDirections = stickDirections)
     }
 
     private val PKG = Regex("^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z0-9_]+)+$")

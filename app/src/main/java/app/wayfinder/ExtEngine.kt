@@ -3,6 +3,7 @@ package app.wayfinder
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 
 /**
@@ -31,12 +32,74 @@ object ExtEngine {
 
     /** The profile of the app that has the controller (the service's 500 ms tick). */
     @Volatile var remap: PadRemap? = null
+        private set
     /** Where keyboard keys go: the screen that has the controller. */
     @Volatile var display: () -> Int = { 0 }
     /** A Wayfinder action (run on the main thread). */
     @Volatile var perform: (ThorAction) -> Unit = {}
+    private var screenOn = true
+
+    fun setScreenOn(on: Boolean) { h.post {
+        screenOn = on
+        if (!on) reset()
+        else for (d in remap?.stickDirections?.keys.orEmpty())
+            if (stickAmounts[d.ordinal] > StickMotion.MOUSE_DEAD) stickRearm.add(d)
+    } }
 
     fun onExt(code: Int, value: Int) { h.post { handle(code, value) } }
+
+    /** Profile changes and key releases are ordered together on the input thread. A new key
+     *  target can share the old native direction mask, so compare the entire mapping too. */
+    fun follow(next: PadRemap?, force: Boolean = false) { h.post {
+        if (force || remap != next) {
+            reset()
+            remap = next
+            // Editing a target while its stick is held must not press the replacement key.
+            for (d in next?.stickDirections?.keys.orEmpty())
+                if (stickAmounts[d.ordinal] > StickMotion.MOUSE_DEAD) stickRearm.add(d)
+        }
+    } }
+
+    fun onSticks(lx: Int, ly: Int, rx: Int, ry: Int) { h.post {
+        stickAmounts = StickMotion.amounts(lx, ly, rx, ry)
+        if (!screenOn || !PadLayerCtl.wanted || !PadLayerCtl.active || !InputMonitor.connected) {
+            releaseSticks(); return@post
+        }
+        val mapping = remap?.stickDirections.orEmpty()
+        for (d in StickDirection.values()) {
+            val amount = stickAmounts[d.ordinal]
+            if (d in stickRearm) {
+                if (amount <= StickMotion.MOUSE_DEAD) stickRearm.remove(d)
+                else continue
+            }
+            val t = mapping[d]
+            val held = stickKeys[d]
+            val want = t as? RemapTarget.Key
+            val down = want != null && PadRemap.isStickTarget(want) && StickMotion.keyHeld(held == want, amount)
+            if (held != null && (!down || held != want)) {
+                key(held.code, false, held.meta); stickKeys.remove(d)
+            }
+            if (down && stickKeys[d] == null) {
+                key(want!!.code, true, want.meta); stickKeys[d] = want
+            }
+            if (t is RemapTarget.Mouse && t.b in 5..8) {
+                val strength = StickMotion.mouseAmount(amount)
+                if (strength > 0f) stickMouse[d] = t.b to strength else stickMouse.remove(d)
+            } else stickMouse.remove(d)
+        }
+        updateMouseMotion()
+    } }
+
+    private var stickAmounts = FloatArray(8)
+    private val stickKeys = HashMap<StickDirection, RemapTarget.Key>()
+    private val stickMouse = HashMap<StickDirection, Pair<Int, Float>>()
+    private val stickRearm = HashSet<StickDirection>()
+
+    private fun releaseSticks() {
+        for (t in stickKeys.values) key(t.code, false, t.meta)
+        stickKeys.clear(); stickMouse.clear()
+        updateMouseMotion()
+    }
 
     // ── hold-to-shift (§6l): while the profile's shift button is held, wfpad withholds everything
     // from the game and echoes it ("J" lines); a button with a "With Shift held" job plays it here.
@@ -45,11 +108,12 @@ object ExtEngine {
     private val shiftHint = Runnable { if (shiftHeld) showShiftHint() }
     fun onGated(code: Int, value: Int) { h.post { gated(code, value) } }
     private fun gated(code: Int, value: Int) {
-        if (value == 2) return
+        if (value == 2 || !screenOn) return
         val b = PadRemap.BY_CODE[code] ?: return
         val r = remap ?: return
         val sh = r.shift
         if (b == sh) {
+            if (value != 0 && !shiftHeld) reset()
             shiftHeld = value != 0
             h.removeCallbacks(shiftHint)
             if (shiftHeld) h.postDelayed(shiftHint, 450) else ForegroundAppService.hideShiftHint()
@@ -71,10 +135,60 @@ object ExtEngine {
     /** Home / Back pressed, a new profile, the layer off: stop macros, release everything. */
     fun releaseAll() { h.post { reset() } }
 
+    /** Injected keyboard events survive a helper crash. Retry their releases on the new
+     *  helper before it can deliver another controller event. */
+    fun helperConnected() { h.post {
+        for ((code, screen) in pendingKeyUps.toMap())
+            if (InputMonitor.send("K $code 0 0 $screen")) pendingKeyUps.remove(code)
+    } }
+
     // ── what's held (reference counts: two buttons may hold the same output) ──
     private val padDown = HashMap<Int, Int>()
     private val keyDown = LinkedHashMap<Int, Int>()
     private val mouseDown = HashMap<Int, Int>()
+    private val mouseMoveDown = HashMap<Int, Int>()
+    private var mouseMoving = false
+    private var mouseAt = 0L
+    private var mouseX = 0f
+    private var mouseY = 0f
+
+    private fun mouseVelocity(): Pair<Float, Float> {
+        val amounts = FloatArray(4)
+        for (b in mouseMoveDown.keys) amounts[b - 5] = 1f
+        for ((b, amount) in stickMouse.values) amounts[b - 5] += amount
+        return StickMotion.mouseVector(amounts[0], amounts[1], amounts[2], amounts[3])
+    }
+
+    private fun updateMouseMotion() {
+        val (x, y) = mouseVelocity()
+        if (x == 0f && y == 0f) {
+            h.removeCallbacks(mouseTick); mouseMoving = false; mouseX = 0f; mouseY = 0f
+        } else if (!mouseMoving) {
+            mouseMoving = true; mouseAt = SystemClock.uptimeMillis()
+            h.postDelayed(mouseTick, TOK, 16)
+        }
+    }
+
+    /** A stationary, held stick does not produce more evdev events: integrate its latest
+     *  deflection at 60 Hz, carrying fractional pixels for smooth low-speed movement. */
+    private val mouseTick = object : Runnable {
+        override fun run() {
+            if (!mouseMoving) return
+            if (!screenOn || !InputMonitor.connected || !PadLayerCtl.wanted || !PadLayerCtl.active) { reset(); return }
+            val now = SystemClock.uptimeMillis()
+            val seconds = (now - mouseAt).coerceIn(0L, 50L) / 1000f
+            mouseAt = now
+            val (x, y) = mouseVelocity()
+            mouseX += x * StickMotion.PIXELS_PER_SECOND * seconds
+            mouseY += y * StickMotion.PIXELS_PER_SECOND * seconds
+            val dx = mouseX.toInt(); val dy = mouseY.toInt()
+            if (dx != 0 || dy != 0) {
+                if (!InputMonitor.send("M $dx $dy")) { reset(); return }
+                mouseX -= dx; mouseY -= dy
+            }
+            h.postDelayed(this, TOK, 16)
+        }
+    }
 
     private fun later(ms: Long, r: () -> Unit) { h.postDelayed(r, TOK, ms) }
 
@@ -88,14 +202,18 @@ object ExtEngine {
     }
     private fun meta() = keyDown.keys.fold(0) { m, c -> m or RemapTarget.metaOf(c) }
     private val keyDisplay = HashMap<Int, Int>()
+    private val pendingKeyUps = HashMap<Int, Int>()
     private fun key(code: Int, down: Boolean, extraMeta: Int = 0) {
         if (!ref(keyDown, code, down)) return
         // the up goes where the down went: a touch on the other screen in between left it held (review 2026-09-25)
         val d = if (down) display().also { keyDisplay[code] = it } else keyDisplay.remove(code) ?: display()
-        InputMonitor.send("K $code ${if (down) 1 else 0} ${meta() or extraMeta or (if (down) 0 else RemapTarget.metaOf(code))} $d")
+        if (!InputMonitor.send("K $code ${if (down) 1 else 0} ${meta() or extraMeta or (if (down) 0 else RemapTarget.metaOf(code))} $d") && !down)
+            pendingKeyUps[code] = d
     }
     private fun mouse(b: Int, down: Boolean) {
-        if (b > 2) { if (down) InputMonitor.send("W ${if (b == 3) 1 else -1} 0"); return }
+        if (b in 5..8) { ref(mouseMoveDown, b, down); updateMouseMotion(); return }
+        if (b in 3..4) { if (down) InputMonitor.send("W ${if (b == 3) 1 else -1} 0"); return }
+        if (b !in 0..2) return
         if (ref(mouseDown, b, down)) InputMonitor.send("B $b ${if (down) 1 else 0}")
     }
 
@@ -161,7 +279,7 @@ object ExtEngine {
     private fun post(ms: Long, f: () -> Unit): Runnable = Runnable(f).also { h.postDelayed(it, TOK, ms) }
 
     private fun handle(code: Int, value: Int) {
-        if (value == 2) return
+        if (value == 2 || !screenOn) return
         if (BuildConfig.DEBUG) Log.d(TAG, "X $code $value")
         val b = PadRemap.BY_CODE[code] ?: return
         val r = remap ?: PadRemap()
@@ -245,11 +363,16 @@ object ExtEngine {
 
     private fun reset() {
         h.removeCallbacksAndMessages(TOK)
+        mouseMoving = false; mouseX = 0f; mouseY = 0f
+        mouseMoveDown.clear(); stickKeys.clear(); stickMouse.clear(); stickRearm.clear()
         shiftHeld = false; shiftActive.clear(); h.removeCallbacks(shiftHint)
         plays.clear(); srcs.clear()
         if (padDown.isNotEmpty()) InputMonitor.send("G p 0 0")
         padDown.clear()
-        for (c in keyDown.keys.reversed()) InputMonitor.send("K $c 0 0 ${keyDisplay[c] ?: display()}")
+        for (c in keyDown.keys.reversed()) {
+            val screen = keyDisplay[c] ?: display()
+            if (!InputMonitor.send("K $c 0 0 $screen")) pendingKeyUps[c] = screen
+        }
         keyDown.clear(); keyDisplay.clear()
         for (b in mouseDown.keys) InputMonitor.send("B $b 0")
         mouseDown.clear()
