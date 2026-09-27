@@ -15,7 +15,8 @@ class StickMotionTest {
     @Test fun directionOrderMatchesNativeBitmask() {
         assertEquals(listOf("LU", "LD", "LL", "LR", "RU", "RD", "RL", "RR"),
             StickDirection.values().map { it.name })
-        assertEquals(255, StickDirection.values().fold(0) { mask, d -> mask or (1 shl d.ordinal) })
+        val allDirections: Int = StickDirection.values().fold(0) { mask, d -> mask or (1 shl d.ordinal) }
+        assertEquals(255, allDirections)
     }
 
     @Test fun keyHysteresisPreventsThresholdChatterAndReleasesAtNeutral() {
