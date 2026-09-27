@@ -83,8 +83,16 @@ class CompanionActivity : ComponentActivity() {
     }
 }
 
-/** Per-game pinned page + notes (prefs "thor_companion"). */
+/** Per-game pinned page + notes (prefs "thor_companion"). The key is the app — or, inside an
+ *  emulator, the running game ("pkg#game", from [GameProfiles]): each game its own page and notes
+ *  (1.2; before, every game of one emulator shared them). */
 object CompanionStore {
+    /** Where [pkg]'s page and notes live right now: the detected game inside it, else the app. */
+    fun keyFor(pkg: String): String = GameProfiles.runningIn(pkg)?.let { GameProfiles.key(pkg, it.game) } ?: pkg
+    /** What to search for: the detected game's title, else the app's name. */
+    fun titleFor(ctx: Context, pkg: String): String =
+        GameProfiles.runningIn(pkg)?.title?.takeIf { it.isNotBlank() } ?: label(ctx, pkg)
+
     private fun prefs(ctx: Context) = ctx.getSharedPreferences("thor_companion", Context.MODE_PRIVATE)
     fun url(ctx: Context, pkg: String): String? = prefs(ctx).getString("url:$pkg", null)
     fun pin(ctx: Context, pkg: String, url: String?) = prefs(ctx).edit().putString("url:$pkg", url).apply()
@@ -102,10 +110,22 @@ object CompanionStore {
 private fun CompanionScreen(pkg: String, onClose: () -> Unit) {
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val g = LocalGlass.current
-    val game = remember(pkg) { CompanionStore.label(ctx, pkg) }
+    // the game inside an emulator, else the app — asked for when unknown (Wayfinder restarted mid-game:
+    // the search said "Azahar map guide" instead of the game's name)
+    var key by remember(pkg) { mutableStateOf(CompanionStore.keyFor(pkg)) }
+    var game by remember(pkg) { mutableStateOf(CompanionStore.titleFor(ctx, pkg)) }
+    LaunchedEffect(pkg) {
+        if (key != pkg) return@LaunchedEffect
+        GameProfiles.ask(pkg)   // the root helper answers in about a second
+        repeat(10) {
+            delay(400)
+            val k = CompanionStore.keyFor(pkg)
+            if (k != key) { key = k; game = CompanionStore.titleFor(ctx, pkg); return@LaunchedEffect }
+        }
+    }
     var tab by remember { mutableStateOf(0) }
     var web by remember { mutableStateOf<WebView?>(null) }
-    var pinned by remember(pkg) { mutableStateOf(CompanionStore.url(ctx, pkg)) }
+    var pinned by remember(key) { mutableStateOf(CompanionStore.url(ctx, key)) }
     GlassScreen(span = app.wayfinder.ui.AuroraSpan.BOTTOM) {
         Column(Modifier.fillMaxSize().padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
@@ -115,18 +135,23 @@ private fun CompanionScreen(pkg: String, onClose: () -> Unit) {
                 BarButton(if (tab == 1) "● Notes" else "Notes") { tab = 1 }
                 if (tab == 0) {
                     BarButton("‹") { web?.let { if (it.canGoBack()) it.goBack() } }
-                    BarButton(if (pinned != null && pinned == web?.url) "📌 Pinned" else "📌 Pin") {
-                        val u = web?.url ?: return@BarButton
+                    val offline = GuideCache.isOffline(web)
+                    BarButton(if (pinned != null && (pinned == web?.url || offline)) "📌 Pinned" else "📌 Pin") {
+                        val w = web ?: return@BarButton
+                        if (offline) return@BarButton   // the saved copy is showing: it IS the pinned page
+                        val u = w.url ?: return@BarButton
                         val next = if (pinned == u) null else u
-                        CompanionStore.pin(ctx, pkg, next); pinned = next
+                        CompanionStore.pin(ctx, key, next); pinned = next
+                        // pinned → an offline copy now (1.2); unpinned → the copy goes
+                        if (next != null) GuideCache.save(ctx, key, w) else GuideCache.drop(ctx, key)
                     }
                 }
                 BarButton("✕") { onClose() }
             }
             // a new WebView per game: the companion is reused when the game changes, and the old
             // one kept showing (and pinning) the previous game's page (review 2026-09-25)
-            if (tab == 0) androidx.compose.runtime.key(pkg) { GuidePage(pkg, game, pinned) { web = it } }
-            else NotesPage(pkg)
+            if (tab == 0) androidx.compose.runtime.key(key) { GuidePage(key, game, pinned) { web = it } }
+            else NotesPage(key)
         }
     }
 }
@@ -143,6 +168,9 @@ private fun BarButton(text: String, onClick: () -> Unit) {
 @Composable
 private fun GuidePage(pkg: String, game: String, pinned: String?, onWeb: (WebView) -> Unit) {
     val start = remember(pkg) { pinned ?: CompanionStore.searchUrl(game) }
+    var failed by remember(pkg) { mutableStateOf(false) }
+    var webRef by remember(pkg) { mutableStateOf<WebView?>(null) }
+    val g = LocalGlass.current
     Box(Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp))) {
         AndroidView(
             factory = { c ->
@@ -151,13 +179,22 @@ private fun GuidePage(pkg: String, game: String, pinned: String?, onWeb: (WebVie
                     settings.domStorageEnabled = true
                     settings.builtInZoomControls = true
                     settings.displayZoomControls = false
-                    webViewClient = WebViewClient()   // links stay in the companion
-                    loadUrl(start)
+                    // the pinned page's offline copy, fallbacks and "can't load" (1.2, GuideCache)
+                    GuideCache.setup(this, c, pkg, pinned, start) { failed = it }
+                    webRef = this
                     onWeb(this)
                 }
             },
             modifier = Modifier.fillMaxSize(),
         )
+        if (failed) Column(Modifier.fillMaxSize().background(if (g.dark) Color(0xF00A0C14) else Color(0xF0E9ECF4)).padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp, androidx.compose.ui.Alignment.CenterVertically),
+            horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
+            Text("The guide page couldn't load", color = g.textPrimary, style = MaterialTheme.typography.titleMedium)
+            Text("Check the Thor's Wi-Fi — some networks need you to sign in on a login page first. A pinned page opens offline once it has loaded here.",
+                color = g.textSecondary, style = MaterialTheme.typography.bodyMedium)
+            BarButton("Retry") { failed = false; webRef?.reload() }
+        }
     }
 }
 

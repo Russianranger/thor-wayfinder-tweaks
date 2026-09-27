@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Keyboard
+import androidx.compose.material.icons.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Mouse
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Dialpad
@@ -229,6 +230,11 @@ fun DeckPanel(st: DeckState, modifier: UiModifier, onClose: () -> Unit, onOpenHu
                         st.padId = p.id; DeckSettings.choose(st.pkg, p.id)
                     }
                 }
+                // 1.2: the game's Guide & notes, right here (shows even over a dual-screen game)
+                Tab(if (st.padId == PAD_GUIDE) "Guide" else null, Icons.Rounded.MenuBook, selected = st.padId == PAD_GUIDE) {
+                    if (st.padId == PAD_TRACKPAD) VirtualInput.releaseMouse()
+                    st.padId = PAD_GUIDE; DeckSettings.choose(st.pkg, PAD_GUIDE)
+                }
             }
             // the game's gyro (Buttons for <app> → Gyro): off / on for this game, from here
             if (app.wayfinder.GyroEngine.configuredForCurrent != null) {
@@ -241,6 +247,7 @@ fun DeckPanel(st: DeckState, modifier: UiModifier, onClose: () -> Unit, onOpenHu
         }
         val pad = pads.firstOrNull { it.id == st.padId } ?: pads.first()
         when {
+            st.padId == PAD_GUIDE -> DeckGuidePane(st.pkg, st.appLabel, onClose, UiModifier.fillMaxWidth().weight(1f))
             pad.isTrackpad -> Trackpad(UiModifier.fillMaxWidth().weight(1f))
             pad.id == PAD_CUSTOM && pad.rows.isEmpty() -> Box(UiModifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {

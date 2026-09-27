@@ -92,7 +92,8 @@ https://github.com/user-attachments/assets/226f78aa-bb8b-410a-bae7-4842b72444f0
 - Share / import controls as a file — filtered, macros arrive switched off
 
 ### Keyboard & mouse
-- A deck on the other screen (Home + Y): PC keys, trackpad, numpad, emulator, media, video, "My pad"
+- A deck on the other screen (Home + Y): PC keys, trackpad, numpad, emulator, media, video, "My pad" — and the
+  game's **Guide** (its guide page and your notes, even over dual-screen games)
 - Trackpad gestures (2-finger tap = right click, 2-finger drag = scroll, hold + move = drag), sticky
   Ctrl / Shift / Alt / Win
 - The right pad picked automatically per app
@@ -115,7 +116,8 @@ https://github.com/user-attachments/assets/226f78aa-bb8b-410a-bae7-4842b72444f0
   follow the app that has the controller
 
 ### Guide & notes
-- A game guide (small browser, pin a page) and your notes on the bottom screen, per app
+- A game guide (small browser, pin a page) and your notes — per game, even inside an emulator; on the bottom
+  screen, or in the Home + Y deck
 
 ### Stick lights
 - AYN default, off, colour, breathing, strobe, spectrum, screen colour
@@ -164,9 +166,9 @@ https://github.com/user-attachments/assets/226f78aa-bb8b-410a-bae7-4842b72444f0
 Every release lists the APK's **SHA-256** and the **signing certificate's SHA-256**. Check them before installing:
 
 ```
-certutil -hashfile wayfinder-1.1.apk SHA256            (Windows)
-sha256sum wayfinder-1.1.apk                             (Linux / macOS)
-apksigner verify --print-certs wayfinder-1.1.apk        (the certificate)
+certutil -hashfile wayfinder-1.2.apk SHA256            (Windows)
+sha256sum wayfinder-1.2.apk                             (Linux / macOS)
+apksigner verify --print-certs wayfinder-1.2.apk        (the certificate)
 ```
 
 ## Privacy and security

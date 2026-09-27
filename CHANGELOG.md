@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.2 — September 2026
+
+- **New: a Guide tab in Keyboard & mouse (Home + Y)** — the game's guide page and your notes on the other screen,
+  one combo away, in any game — even dual-screen ones (melonDS, Azahar, Cemu…). Pin a page, go back, or open the
+  full Guide page to edit your notes.
+- **Guides and notes per game:** inside an emulator, each game now has its own pinned page and notes (before,
+  all the games of one emulator shared them), and the guide search uses the game's title.
+- **Pinned guides work offline:** pinning a page saves a copy of it (refreshed whenever it loads online); with no
+  connection, or if the site fails, the pinned guide opens from that copy.
+- A guide page that can't load now says so (with Retry) instead of staying blank — e.g. on a Wi-Fi that needs a
+  login page first.
+
 ## 1.1 — September 2026
 
 - **New: "Close this app"** — an action for any combo or game button: closes the app on the screen that has
