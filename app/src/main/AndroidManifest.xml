@@ -28,7 +28,7 @@
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
-        android:label="@string/app_name"
+        android:label="${appLabel}"
         android:supportsRtl="true"
         android:theme="@style/Theme.Wayfinder">
 
@@ -47,7 +47,7 @@
         <activity
             android:name=".QuickPanelActivity"
             android:theme="@style/Theme.Wayfinder.Glass"
-            android:taskAffinity="app.wayfinder.panel"
+            android:taskAffinity="${applicationId}.panel"
             android:launchMode="singleTask"
             android:excludeFromRecents="true"
             android:label="Quick panel"
@@ -58,7 +58,7 @@
         <activity
             android:name=".CompanionActivity"
             android:theme="@style/Theme.Wayfinder"
-            android:taskAffinity="app.wayfinder.companion"
+            android:taskAffinity="${applicationId}.companion"
             android:launchMode="singleTask"
             android:label="Guide &amp; notes"
             android:exported="false" />
@@ -108,7 +108,7 @@
         <!-- #27 — the Thor Keyboard (input method) -->
         <service
             android:name=".keyboard.ThorKeyboardService"
-            android:label="Wayfinder Keyboard"
+            android:label="${appLabel} Keyboard"
             android:exported="true"
             android:permission="android.permission.BIND_INPUT_METHOD">
             <intent-filter>

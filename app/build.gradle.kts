@@ -26,8 +26,10 @@ android {
         // getWindowsOnAllDisplays(), both API 30 — the app cannot function below that.
         minSdk = 30
         targetSdk = 34
-        versionCode = 3
+        // CI test builds increase monotonically while ordinary local/release builds retain 3.
+        versionCode = providers.gradleProperty("wayfinderTestVersionCode").orNull?.toInt() ?: 3
         versionName = "1.2"
+        manifestPlaceholders["appLabel"] = "Wayfinder"
 
     }
 
@@ -54,6 +56,9 @@ android {
             )
         }
         debug {
+            applicationIdSuffix = ".test"
+            versionNameSuffix = "-wayfinder-test"
+            manifestPlaceholders["appLabel"] = "Wayfinder Test"
             // `-Pminify`: a debug build shrunk like the release (to measure / test it on the Thor)
             isMinifyEnabled = providers.gradleProperty("minify").isPresent
             proguardFiles(
@@ -89,6 +94,7 @@ android {
 }
 
 dependencies {
+    testImplementation("junit:junit:4.13.2")
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
     implementation("androidx.activity:activity-compose:1.9.1")
